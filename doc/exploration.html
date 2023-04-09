@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- 2023-04-09 Sun 09:48 -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Emacs pPREPL exploration</title>
+<meta name="author" content="Jakub Šťastný" />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+<link rel="stylesheet" type="text/css" href="../../assets/styles.css"/>
+<link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
+<script type="module" src="../../assets/script.js"></script>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">Emacs pPREPL exploration</h1>
+
+<div id="outline-container-org64479f8" class="outline-2">
+<h2 id="org64479f8"><span class="section-number-2">1.</span> Objectives</h2>
+<div class="outline-text-2" id="text-1">
+<ul class="org-ul">
+<li>Come up with a model for REPL-driven development that:
+<ul class="org-ul">
+<li>Provides <code>(break)</code> that starts a new sub-REPL in given point and gives access to the local context.</li>
+<li>Starts a new sub-REPL automatically when an error is encountered and behaves like <code>(break)</code> does, but additionally giving access to the error object.</li>
+<li>Sub-REPLs nests and each level can be quit using <code>:repl/quit</code>.</li>
+<li>Is based on the socket REPL, simplicity and extensibility rather than behind-the-scene magic.</li>
+<li>Gets out of the way: my screen is small and all I want to look at is my code. <code>C-x C-e</code> displays results inline like Cider does. Only when needed (such as when an error is thrown), the REPL is brought forwards (probably a split view code/REPL is best).</li>
+<li>Works in unsaved buffers. This is really important, as I work in Org mode files in "zoomed-in" mode (<code>C-c '</code> when in a source block opens it in a new buffer which doesn't get saved until we zoom out of it, at which point its contents update the original source block). Having to zoom out and save constantly is a big pain and should only happen once I'm happy with the code block as such.</li>
+<li>Is a suitable setup for production processes and not only development.</li>
+<li>Allows hot-code patching in production if absolutely necessary.</li>
+</ul></li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org3512ca5" class="outline-2">
+<h2 id="org3512ca5"><span class="section-number-2">2.</span> Proof-of-concept</h2>
+<div class="outline-text-2" id="text-2">
+</div>
+<div id="outline-container-org528e3f8" class="outline-3">
+<h3 id="org528e3f8"><span class="section-number-3">2.1.</span> Deps</h3>
+<div class="outline-text-3" id="text-2-1">
+<div class="org-src-container">
+<pre class="src src-clojure">{<span class="org-clojure-keyword">:paths</span> [<span class="org-string">"src"</span>]
+ <span class="org-clojure-keyword">:aliases</span>
+ {<span class="org-clojure-keyword">:repl-server</span>
+  {<span class="org-clojure-keyword">:extra-paths</span> [<span class="org-string">"dev"</span>] <span class="org-comment">; This makes dev/user.clj to load.</span>
+   <span class="org-clojure-keyword">:extra-deps</span> {<span class="org-type">mvxcvi</span>/puget {<span class="org-clojure-keyword">:</span><span class="org-type">mvn</span><span class="org-default">/</span><span class="org-clojure-keyword">version</span> <span class="org-string">"1.3.4"</span>}}
+   <span class="org-clojure-keyword">:exec-fn</span> <span class="org-type">jakub-stastny.dev.repl.server</span>/start-server
+   <span class="org-clojure-keyword">:exec-args</span> {<span class="org-clojure-keyword">:name</span> <span class="org-string">"repl-server"</span>
+               <span class="org-clojure-keyword">:port</span> 5555
+               <span class="org-clojure-keyword">:accept</span> <span class="org-type">jakub-stastny.dev.repl.server</span>/repl
+               <span class="org-clojure-keyword">:server-daemon</span> <span class="org-constant">false</span>}}}}
+</pre>
+</div>
+
+<ul class="org-ul">
+<li><b>Ref:</b> <a href="https://clojure.org/guides/deps_and_cli#socket_repl">Deps and CLI guide: socket REPL</a>.</li>
+<li><a href="https://github.com/clojure/clojure/blob/38524061dcb14c598c239be87184b3378ffc5bac/src/clj/clojure/main.clj#L368">clojure.main/repl</a>.</li>
+</ul>
+
+<div class="org-src-container">
+<pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">user</span>
+  <span class="org-doc">"This gets loaded automatically before the server starts."</span>
+  (<span class="org-clojure-keyword">:require</span> [jakub-stastny.dev.repl <span class="org-clojure-keyword">:refer</span> (upgrade-repl local-context break try-break ls)]))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">start</span> []
+  (<span class="org-keyword">def</span> <span class="org-variable-name">app</span> {<span class="org-clojure-keyword">:start-time</span> (<span class="org-keyword">new</span> java.util.Date)}) <span class="org-comment">; Or (System/currentTimeMillis)</span>
+  (println <span class="org-string">"Standard REPL started."</span>)
+  (println <span class="org-string">"Additional helpers: local-context &amp; break."</span>)
+  (println)
+  (println <span class="org-string">"app:"</span> (pr-str app))
+  (println)
+  (upgrade-repl))
+
+(<span class="org-keyword">comment</span>
+  (start)
+  app
+  (<span class="org-keyword">let</span> [a <span class="org-clojure-keyword">:top-level</span>] (<span class="org-keyword">let</span> [b <span class="org-clojure-keyword">:nested</span>] (local-context)))
+  <span class="org-builtin">*2</span>
+  (<span class="org-keyword">doseq</span> [i [1 0]] (break) (/ 1 i))
+
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">ExceptionInfo with data.</span>
+  (<span class="org-keyword">throw</span> (ex-info <span class="org-string">"Fuck this"</span> {<span class="org-clojure-keyword">:cant-be-bothered</span> <span class="org-constant">true</span>}))
+  <span class="org-builtin">*e</span>
+  app
+  (local-context)
+  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
+
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Other exceptions.</span>
+  (conj {} 1)
+  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
+
+  <span class="org-comment">; Get out of nested REPLs with exception context.</span>
+  <span class="org-clojure-keyword">:</span><span class="org-type">repl</span><span class="org-default">/</span><span class="org-clojure-keyword">quit</span>
+  ,)
+
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org40176b4" class="outline-3">
+<h3 id="org40176b4"><span class="section-number-3">2.2.</span> REPL server</h3>
+<div class="outline-text-3" id="text-2-2">
+<div class="org-src-container">
+<pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">jakub-stastny.dev.repl.server</span>
+  (<span class="org-clojure-keyword">:require</span> [clojure.core.server <span class="org-clojure-keyword">:as</span> s]))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">repl</span> []
+  (<span class="org-type">clojure.main</span>/repl
+   <span class="org-clojure-keyword">:prompt</span> #(print (str <span class="org-string">"host.socket.repl."</span> (ns-name <span class="org-builtin">*ns*</span>) <span class="org-string">"=&gt; "</span>))
+   <span class="org-clojure-keyword">:init</span> <span class="org-type">s</span>/repl-init
+   <span class="org-clojure-keyword">:read</span> <span class="org-type">s</span>/repl-read))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">start-server</span> [{<span class="org-clojure-keyword">:keys</span> [port] <span class="org-clojure-keyword">:as</span> opts}]
+  (println (str <span class="org-string">"~ Starting socket REPL on port "</span> port <span class="org-string">"."</span>))
+  (println (str <span class="org-string">"  Connect: rlwrap nc localhost "</span> port))
+  (println)
+  (println      <span class="org-string">"Use *1 *2 *3 to get the last three values."</span>)
+  (println      <span class="org-string">"Use *e to get the last exception raised."</span>)
+  (println)
+  (println      <span class="org-string">"Some clojure.repl fns: source apropos dir pst doc find-doc."</span>)
+  (println      <span class="org-string">"See https://clojuredocs.org/clojure.repl for a full reference."</span>)
+  (println)
+  (println      <span class="org-string">"There's also javadoc from clojure.java.javadoc and pp &amp; pprint from clojure.pprint."</span>)
+  (println)
+  (println      <span class="org-string">"This is the base REPL, you'll probably want to upgrade it by running (start)."</span>)
+  (println)
+
+  <span class="org-comment">; We have to print the prompt or inf-clojure won't recognise the REPL server being ready.</span>
+  (<span class="org-keyword">future</span> (<span class="org-type">s</span>/start-server opts))
+  (repl)
+
+  <span class="org-comment">; Without this, :repl/quit or C-d won't exit the socket server.</span>
+  (<span class="org-type">System</span>/exit 0))
+</pre>
+</div>
+</div>
+
+<div id="outline-container-org4d2839f" class="outline-4">
+<h4 id="org4d2839f"><span class="section-number-4">2.2.1.</span> <span class="todo TODO">TODO</span> Recover from C-c</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+<a href="https://clojuredocs.org/clojure.repl/set-break-handler">https://clojuredocs.org/clojure.repl/set-break-handler</a>!
+</p>
+</div>
+</div>
+
+<div id="outline-container-org3f82d30" class="outline-4">
+<h4 id="org3f82d30"><span class="section-number-4">2.2.2.</span> <span class="todo TODO">TODO</span> Upgrade to pREPL in <code>(start)</code></h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+<a href="https://github.com/jackrusher/scimacs">https://github.com/jackrusher/scimacs</a>
+<a href="https://github.com/borkdude/clj2el">https://github.com/borkdude/clj2el</a>
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">jakub-stastny.dev.repl</span>
+  (<span class="org-clojure-keyword">:require</span>
+   [clojure.string <span class="org-clojure-keyword">:as</span> str]
+   [clojure.core.server <span class="org-clojure-keyword">:as</span> rs]
+   [puget.printer <span class="org-clojure-keyword">:as</span> puget]))
+
+(<span class="org-keyword">def</span> <span class="org-variable-name">colours</span> {<span class="org-clojure-keyword">:red</span> 31 <span class="org-clojure-keyword">:green</span> 32 <span class="org-clojure-keyword">:yellow</span> 33
+            <span class="org-clojure-keyword">:blue</span> 34 <span class="org-clojure-keyword">:purple</span> 35 <span class="org-clojure-keyword">:cyan</span> 36 <span class="org-clojure-keyword">:grey</span> 37})
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">colour</span> <span class="org-doc">"Wraps text in ANSI colour escape sequence"</span> [colour text]
+  (<span class="org-keyword">if-let</span> [colour-code (colours colour)]
+    (str <span class="org-string">"</span><span class="org-string"><span class="org-bold">\0</span></span><span class="org-string">33["</span> colour-code <span class="org-string">"m"</span> text <span class="org-string">"</span><span class="org-string"><span class="org-bold">\0</span></span><span class="org-string">33[0m"</span>) text))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">https://stackoverflow.com/questions/38183267/clojures-eval-does-not-see-local-symbols</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">DOES &amp;env get both a &amp; b from (let [a :a] (let [b :b] (break))) ?</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">super-unsafe-eval</span>
+  <span class="org-doc">"Like `</span><span class="org-doc"><span class="org-constant">eval</span></span><span class="org-doc">`, but also exposes lexically-bound variables to eval. This</span>
+<span class="org-doc">  is almost certainly a bad idea."</span>
+  [form]
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :SUE)</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :super-unsafe-eval `(eval (list 'let</span>
+  <span class="org-comment-delimiter">;;                   </span><span class="org-comment">~(vec (mapcat #(vector `(quote ~%)</span>
+  <span class="org-comment-delimiter">;;                                          </span><span class="org-comment">`(list 'quote ~%))</span>
+  <span class="org-comment-delimiter">;;                                 </span><span class="org-comment">(keys &amp;env)))</span>
+  <span class="org-comment-delimiter">;;                   </span><span class="org-comment">~form)))</span>
+  `(eval (list 'let
+             ~(vec (mapcat #(vector `(<span class="org-keyword">quote</span> ~<span class="org-variable-name">%</span>)
+                                    `(list 'quote ~<span class="org-variable-name">%</span>))
+                           (keys &amp;env)))
+             ~form)))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">super-unsafe-eval-wrapper</span> [form] (super-unsafe-eval form))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">From The joy of Clojure</span>
+(<span class="org-keyword">defn</span> <span class="org-function-name">contextual-eval</span> [ctx expr]
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :ctx-ev :ctx ctx :e expr) ; DBG</span>
+  <span class="org-comment">; IT DOESN'T KNOW HOW TO SERIALISE THIS:</span>
+  <span class="org-comment">; chunk_328 #object[clojure.lang.ArrayChunk 0x6428591a "clojure.lang.ArrayChunk@6428591a"]</span>
+  (prn <span class="org-clojure-keyword">:ctx-eval</span> <span class="org-comment">; This won't work in CLJS I think.</span>
+    `(<span class="org-keyword">let</span> [~@(mapcat (<span class="org-keyword">fn</span> [[k v]] [k `'~v]) (filter (<span class="org-keyword">fn</span> [[k v]] (not (.startsWith (str k) <span class="org-string">"chunk"</span>))) ctx))]
+        ~expr))
+  (eval <span class="org-comment">; This won't work in CLJS I think.</span>
+    `(<span class="org-keyword">let</span> [~@(mapcat (<span class="org-keyword">fn</span> [[k v]] [k `'~v]) (filter (<span class="org-keyword">fn</span> [[k v]] (not (.startsWith (str k) <span class="org-string">"chunk"</span>))) ctx))]
+        ~expr)))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">@phronmophobic:</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">Instead of embedding the values, I would use eval to create a function and call it:</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">You can also do something like save the values in a dynamic variable and then grab the values inside of the eval from the dynamic variable, but I think wrapping in a function is more explicit and less brittle.</span>
+(<span class="org-keyword">defn</span> <span class="org-function-name">contextual-eval-2</span> [ctx expr]
+  (<span class="org-keyword">let</span> [f
+        (eval
+         `(<span class="org-keyword">fn</span> [~@(keys ctx)]
+            ~expr))]
+    (apply f (vals ctx))))
+
+(prn <span class="org-clojure-keyword">:ctx-evl-2</span> (contextual-eval-2 {'a (Exception. <span class="org-string">"hi"</span>) 'b 2}
+                   '(str (.getMessage a) <span class="org-string">" "</span> b)))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">TODO: map onto a command like "vars" or "ls".</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">local-context</span> []
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :lc) ; DBG</span>
+  (<span class="org-keyword">let</span> [symbols (keys &amp;env)]
+    <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :local-context &amp;env :keys (keys &amp;env)) ; DBG</span>
+    (zipmap (map (<span class="org-keyword">fn</span> [sym] `(<span class="org-keyword">quote</span> ~sym)) symbols) symbols)))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">Do NOT extract :eval into a method or the local-context will get lost.</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">break</span> []
+  `(<span class="org-keyword">do</span>
+     (<span class="org-type">clojure.main</span>/repl
+      <span class="org-clojure-keyword">:prompt</span> #(print (colour <span class="org-clojure-keyword">:cyan</span> <span class="org-string">"debug=&gt; "</span>))
+      <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read
+      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval-2 (local-context))
+      <span class="org-clojure-keyword">:print</span> prn <span class="org-comment-delimiter">;; </span><span class="org-comment">puget.pprint</span>
+      )))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">(doseq [i [1 0]] (try-break (/ 1 i)))</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">try-break</span> [expr]
+  `(<span class="org-keyword">try</span> ~expr (<span class="org-keyword">catch</span> Exception ~'<span class="org-builtin">*e</span> (break))))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">TODO: make this a command "ls" so we don't have to type "(ls)". This needs overriding read.</span>
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">ls</span> [] `(keys (local-context)))
+
+(<span class="org-keyword">def</span> <span class="org-variable-name">nesting-level</span> (atom 0))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">error-prompt</span> [e]
+  #(print (str
+           (colour <span class="org-clojure-keyword">:red</span> (last (<span class="org-type">str</span>/split (str (type e)) #<span class="org-string">"</span><span class="org-string"><span class="org-bold">\.</span></span><span class="org-string">"</span>))) <span class="org-string">"."</span>
+           (colour <span class="org-clojure-keyword">:green</span> <span class="org-builtin">*ns*</span>) <span class="org-string">"."</span>
+           (colour <span class="org-clojure-keyword">:cyan</span> @nesting-level)
+           (colour <span class="org-clojure-keyword">:yellow</span><span class="org-string">" &#955; "</span>))))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">repl-read respects :repl/quit</span>
+(<span class="org-keyword">declare</span> handle-error)
+(<span class="org-keyword">defmacro</span> <span class="org-function-name">start-nested-repl</span> [<span class="org-builtin">*e</span>]
+  `(<span class="org-keyword">do</span>
+     (println <span class="org-string">"Inspect *e for details about the error."</span>)
+     (<span class="org-type">clojure.main</span>/repl
+      <span class="org-clojure-keyword">:prompt</span> (error-prompt ~'<span class="org-builtin">*e</span>)
+      <span class="org-clojure-keyword">:caught</span> handle-error
+      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval-2 (local-context))
+      <span class="org-comment-delimiter">;; </span><span class="org-comment">:eval super-unsafe-eval-wrapper</span>
+      <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read
+      <span class="org-clojure-keyword">:print</span> prn <span class="org-comment-delimiter">;; </span><span class="org-comment">puget.pprint</span>
+      )))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">handle-error</span> [<span class="org-builtin">*e</span>]
+  (swap! nesting-level inc)
+  (println (ex-message <span class="org-builtin">*e</span>) (<span class="org-keyword">or</span> (ex-data <span class="org-builtin">*e</span>) <span class="org-string">""</span>))
+  <span class="org-comment">;(prn :context (local-context)) ; e</span>
+  (start-nested-repl <span class="org-builtin">*e</span>)
+  (swap! nesting-level dec))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">upgrade-init</span> []
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Here we might do some requires like Clojure does:</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">https://github.com/clojure/clojure/blob/master/src/clj/clojure/main.clj#L355</span>
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">I've seen a better approach for :eval to wrap the whole code in (do (require...) (code)) so it's available anywhere, although that can easily lead to code that works only in the REPL.</span>
+  (<span class="org-type">rs</span>/repl-init))
+
+<span class="org-comment-delimiter">; </span><span class="org-comment">This REPL is meant to be used as Pry in Ruby, not in Emacs, for that we will use pREPL later.</span>
+(<span class="org-keyword">defn</span> <span class="org-function-name">upgrade-repl</span> []
+  (<span class="org-type">clojure.main</span>/repl
+   <span class="org-clojure-keyword">:caught</span> #'handle-error
+   <span class="org-clojure-keyword">:prompt</span> #(print (str (colour <span class="org-clojure-keyword">:green</span> (ns-name <span class="org-builtin">*ns*</span>)) (colour <span class="org-clojure-keyword">:cyan</span><span class="org-string">" &#955; "</span>)))
+   <span class="org-clojure-keyword">:print</span> prn <span class="org-comment">; TODO pretty-print</span>
+   <span class="org-clojure-keyword">:init</span> #'upgrade-init
+   <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read))
+
+<span class="org-comment-delimiter">;; </span><span class="org-comment">FIXME: *e is missing.</span>
+(<span class="org-keyword">comment</span>
+  (upgrade-repl)
+
+  <span class="org-string">"value"</span>
+  <span class="org-builtin">*1</span>
+
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">ExceptionInfo with data.</span>
+  (<span class="org-keyword">throw</span> (ex-info <span class="org-string">"Fuck this"</span> {<span class="org-clojure-keyword">:cant-be-bothered</span> <span class="org-constant">true</span>}))
+  (ex-data <span class="org-builtin">*e</span>)
+  (ex-message <span class="org-builtin">*e</span>)
+
+  <span class="org-comment-delimiter">;; </span><span class="org-comment">Other exceptions.</span>
+  (conj {} 1)
+  (ex-data <span class="org-builtin">*e</span>)
+  (ex-message <span class="org-builtin">*e</span>)
+
+  <span class="org-clojure-keyword">:</span><span class="org-type">repl</span><span class="org-default">/</span><span class="org-clojure-keyword">quit</span>
+  ,)
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3873c7c" class="outline-3">
+<h3 id="org3873c7c"><span class="section-number-3">2.3.</span> Usage</h3>
+<div class="outline-text-3" id="text-2-3">
+<div class="org-src-container">
+<pre class="src src-sh">clojure -X:repl-server
+clojure -X:repl-server :port 1234
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org3adcb90" class="outline-3">
+<h3 id="org3adcb90"><span class="section-number-3">2.4.</span> Emacs integration</h3>
+<div class="outline-text-3" id="text-2-4">
+</div>
+<div id="outline-container-org343c853" class="outline-4">
+<h4 id="org343c853"><span class="section-number-4">2.4.1.</span> Take I: <code>inf-clojure</code></h4>
+<div class="outline-text-4" id="text-2-4-1">
+<div class="org-src-container">
+<pre class="src src-emacs-lisp">((nil
+  (inf-clojure-custom-startup . <span class="org-string">"clojure -X:repl-server :port %d"</span>)
+  <span class="org-comment-delimiter">;</span><span class="org-comment">(inf-clojure-custom-startup . ("localhost" . 5555))</span>
+  (inf-clojure-custom-repl-type . clojure)))
+</pre>
+</div>
+
+<ul class="org-ul">
+<li>Doc <a href="https://github.com/clojure-emacs/inf-clojure#startup">inf-clojure#startup</a>.</li>
+<li>Source <a href="https://github.com/clojure-emacs/inf-clojure/blob/master/inf-clojure.el">inf-clojure.el</a>.</li>
+</ul>
+</div>
+
+<div id="outline-container-org95ed848" class="outline-5">
+<h5 id="org95ed848"><span class="section-number-5">2.4.1.1.</span> <span class="todo TODO">TODO</span> How to load a whole buffer?</h5>
+<div class="outline-text-5" id="text-2-4-1-1">
+<p>
+<i>Reloading a namespace (via require :reload/require :reload-all)</i>
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf137896" class="outline-5">
+<h5 id="orgf137896"><span class="section-number-5">2.4.1.2.</span> ISSUE</h5>
+<div class="outline-text-5" id="text-2-4-1-2">
+<ul class="org-ul">
+<li>Wouldn't work in Org narrowed source window.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org879b013" class="outline-5">
+<h5 id="org879b013"><span class="section-number-5">2.4.1.3.</span> WORKAROUND</h5>
+<div class="outline-text-5" id="text-2-4-1-3">
+<ul class="org-ul">
+<li>Open <a href="./src/playground.clj">./src/playground.clj</a>.</li>
+<li>Start the REPL using <code>inf-clojure-socket-repl</code>.</li>
+<li>Close the file.</li>
+<li>Go back to the Org file and work as normal.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org18efa95" class="outline-5">
+<h5 id="org18efa95"><span class="section-number-5">2.4.1.4.</span> Outcome</h5>
+<div class="outline-text-5" id="text-2-4-1-4">
+<ul class="org-ul">
+<li>Inf-clojure doesn't behave the way I want, in particular it forces me to work in split view at all times.</li>
+<li>Additionally things were broken and took time to debug.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orgb54b57c" class="outline-4">
+<h4 id="orgb54b57c"><span class="section-number-4">2.4.2.</span> Discussion: why is there no Emacs pREPL?</h4>
+<div class="outline-text-4" id="text-2-4-2">
+<p>
+It seems like the way to go, why isn't there a plugin?
+</p>
+
+<p>
+Scenario: the main process has 2 REPLs running, a socket REPL and another pREPL for Cider-like thingy.
+</p>
+
+<p>
+ACTUALLY: then I'd loose my nested REPL interface, I wouldn't even know what's been happening.
+</p>
+
+<p>
+OR NOT? Like it'd work under the hood, but how would it behave?
+</p>
+
+<p>
+It could report exceptions same way Cider does C-x C-e at which point you open side-by-side and debug.
+</p>
+
+<p>
+Of course it'd have to pretty-print it, not show the "real" {:tag &#x2026;} communication.
+</p>
+
+<p>
+You could tweak what inf-clojure sends and that'd do. It'd still show the whole {:tag &#x2026;} thingy on receive, but whatevs.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org99da348" class="outline-4">
+<h4 id="org99da348"><span class="section-number-4">2.4.3.</span> Stepping stone: find or make a nice &amp; easy to use client for the socket REPL</h4>
+<div class="outline-text-4" id="text-2-4-3">
+<ul class="org-ul">
+<li>Something like Pry in Ruby.</li>
+<li>Start with plain socket REPL, upgrade to pREPL.</li>
+<li>Show <code>out</code> in colours with <code>=&gt; ...</code>, distinguish <code>out</code>.</li>
+<li>SubREPL for <code>err</code>.</li>
+<li>Rescue from <code>System/exit</code>.</li>
+<li>Copy and paste from Emacs <code>:'(</code>.
+<ul class="org-ul">
+<li>We need something like <code>copy-last-sexp</code>, <code>copy-parent-form</code> and <code>copy-buffer</code>.</li>
+</ul></li>
+</ul>
+</div>
+
+<div id="outline-container-orga6f1f4b" class="outline-5">
+<h5 id="orga6f1f4b"><span class="section-number-5">2.4.3.1.</span> <span class="todo TODO">TODO</span> Verify it can run say <code>clojure.inspector/inspect-tree</code></h5>
+</div>
+<div id="outline-container-orgf99e631" class="outline-5">
+<h5 id="orgf99e631"><span class="section-number-5">2.4.3.2.</span> <span class="todo TODO">TODO</span> What if you run the client out of Emacs</h5>
+<div class="outline-text-5" id="text-2-4-3-2">
+<p>
+Just send the forms to it. Shell in Emacs is pain and there are no colours (pretty-printing).
+</p>
+
+<p>
+That client would then have to communicate over a socket with Emacs (would be client/server at the same time).
+</p>
+
+<p>
+Or make the server pretty-print? Like if you don't care, here's your Emacs buffer, if it sucks to read, just try to read it in the console where the server prints it?
+</p>
+
+<p>
+YEAH TOTALLY, let the server do it (unless in production).
+</p>
+
+<p>
+EXCEPT the server provides UNUPGRADED REPL only!
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0e414d6" class="outline-4">
+<h4 id="org0e414d6"><span class="section-number-4">2.4.4.</span> Take II: custom Emacs plugin</h4>
+<div class="outline-text-4" id="text-2-4-4">
+</div>
+<div id="outline-container-org05d48ac" class="outline-5">
+<h5 id="org05d48ac"><span class="section-number-5">2.4.4.1.</span> Resources</h5>
+<div class="outline-text-5" id="text-2-4-4-1">
+<ul class="org-ul">
+<li>Emacs EDN parser <a href="https://github.com/clojure-emacs/parseedn">parseedn</a>.</li>
+<li><a href="https://tonsky.me/blog/clojure-sublimed-3/">https://tonsky.me/blog/clojure-sublimed-3/</a></li>
+<li><a href="https://github.com/Olical/propel">propel</a>.</li>
+<li><a href="https://oli.me.uk/clojure-socket-prepl-cookbook/">Clojure socket pREPL cookbook</a>.</li>
+<li><a href="https://blog.jakubholy.net/how-to-use-clojure-1.10-prepl/">How to use Clojure pREPL</a>.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org9f82739" class="outline-5">
+<h5 id="org9f82739"><span class="section-number-5">2.4.4.2.</span> Architecture</h5>
+<div class="outline-text-5" id="text-2-4-4-2">
+<ul class="org-ul">
+<li>Start a normal socket REPL, upgrade to pREPL at the beginning of the client session.</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

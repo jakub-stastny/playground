@@ -1,4 +1,5 @@
 #+TITLE: Emacs pPREPL exploration
+#+SETUPFILE: setupfile.org
 
 * Objectives
 - Come up with a model for REPL-driven development that:
