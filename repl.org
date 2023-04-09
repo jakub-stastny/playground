@@ -43,60 +43,163 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
   {:paths ["src"]
    :aliases
    {:repl-server
-    {:exec-fn jakub-stastny.dev.repl.server/start-server
+    {:extra-paths ["dev"]
+     :exec-fn jakub-stastny.dev.repl.server/start-server
      :exec-args {:name "repl-server"
                  :port 5555
-                 :accept jakub-stastny.dev.server.repl/repl
+                 :accept jakub-stastny.dev.repl.server/repl
                  :server-daemon false}}}}
 #+end_src
 
 - *Ref:* [[https://clojure.org/guides/deps_and_cli#socket_repl][Deps and CLI guide: socket REPL]].
 - [[https://github.com/clojure/clojure/blob/38524061dcb14c598c239be87184b3378ffc5bac/src/clj/clojure/main.clj#L368][clojure.main/repl]].
 
-** ~(break)~
-https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDrivenDevelopment.md
+#+begin_src clojure :tangle dev/user.clj :mkdirp yes
+  (ns user
+    "This gets loaded automatically before the server starts."
+    (:require [jakub-stastny.dev.repl :refer (upgrade-repl local-context break)]))
 
-#+begin_src clojure
-(defmacro break []
-  `(clojure.main/repl
-    :prompt #(print "debug=> ")
-    :read readr
-    :eval (partial contextual-eval (local-context))))
+  (defn start []
+    (def app {:start-time (new java.util.Date)})
+    (println "Standard REPL started.")
+    (println "Additional helpers: local-context & break.")
+    (println)
+    (println "app:" (pr-str app))
+    (println)
+    (upgrade-repl))
 
-(defn foo []
-  (let [a 1] (break) a))
+  (comment
+    (start)
+    app
+    (let [a "test"] (local-context))
+    ,*2
+    (macroexpand '(break'))
+    (doseq [i [1 2 3]] (break)) ; Syntax error macroexpanding clojure.core/fn at (4:20).
+    ; #:clojure.error{:phase :macro-syntax-check, :line 4, :column 20, :source NO_SOURCE_PATH, :symbol clojure.core/fn}
 
-(foo)
+    ;; ExceptionInfo with data.
+    (throw (ex-info "Fuck this" {:cant-be-bothered true}))
+    ,*e  ;; Syntax error compiling fn* at (1:1).
+        ;; #:clojure.error{:phase :compile-syntax-check, :line 1, :column 1, :source NO_SOURCE_PATH, :symbol fn*}
+    app ;; ; Syntax error compiling fn* at (1:1).
+        ;; #:clojure.error{:phase :compile-syntax-check, :line 1, :column 1, :source NO_SOURCE_PATH, :symbol fn*}
+    (local-context)                       ; The same as well.
+    (ex-data *e)
+    (ex-message *e)
+
+    ;; Other exceptions.
+    (conj {} 1)
+    (ex-data *e)
+    (ex-message *e)
+
+    ; Get out of nested REPLs with exception context.
+    :repl/quit
+    ,)
+
 #+end_src
 
 ** REPL server
-#+begin_src clojure :tangle src/jakub-stastny/dev/repl/server.clj :mkdirp yes
+#+begin_src clojure :tangle src/jakub_stastny/dev/repl/server.clj :mkdirp yes
   (ns jakub-stastny.dev.repl.server
-    (:require [clojure.core.server :as s]
-              [jakub-stastny.dev.repl :as pg]))
+    (:require [clojure.core.server :as s]))
 
   (defn repl []
     (clojure.main/repl
-     :caught pg/handle-error
      :prompt #(print (str "host.socket.repl." (ns-name *ns*) "=> "))
-     :print prn ; TODO pretty-print
      :init s/repl-init
      :read s/repl-read))
 
   (defn start-server [{:keys [port] :as opts}]
     (println (str "~ Starting socket REPL on port " port "."))
     (println (str "  Connect: rlwrap nc localhost " port))
+    (println)
+    (println      "Use *1 *2 *3 to get the last three values.")
+    (println      "Use *e to get the last exception raised.")
+    (println)
+    (println      "Some clojure.repl fns: source apropos dir pst doc find-doc.")
+    (println      "See https://clojuredocs.org/clojure.repl for a full reference.")
+    (println)
+    (println      "There's also javadoc from clojure.java.javadoc and pp & pprint from clojure.pprint.")
+    (println)
+    (println      "This is the base REPL, you'll probably want to upgrade it by running (start).")
+    (println)
+
     ; We have to print the prompt or inf-clojure won't recognise the REPL server being ready.
     (future (s/start-server opts))
-    ;(repl)
-    )
+    (repl)
+
+    ; Without this, :repl/quit or C-d won't exit the socket server.
+    (System/exit 0))
 #+end_src
 
-#+begin_src clojure :tangle src/jakub-stastny/dev/repl.clj :mkdirp yes
+#+begin_src clojure :tangle src/jakub_stastny/dev/repl.clj :mkdirp yes
   (ns jakub-stastny.dev.repl
     (:require
      [clojure.string :as str]
      [clojure.core.server :as rs]))
+
+  (defmacro super-unsafe-eval
+    "Like `eval`, but also exposes lexically-bound variables to eval. This
+    is almost certainly a bad idea."
+    [form]
+    (prn :SUE)
+    (prn :super-unsafe-eval `(eval (list 'let
+                      ~(vec (mapcat #(vector `(quote ~%)
+                                             `(list 'quote ~%))
+                                    (keys &env)))
+                      ~form)))
+    `(eval (list 'let
+               ~(vec (mapcat #(vector `(quote ~%)
+                                      `(list 'quote ~%))
+                             (keys &env)))
+               ~form)))
+
+  ; From The joy of Clojure
+  (defn contextual-eval [ctx expr]
+    (prn :ctx-ev :ctx ctx :e expr) ; DBG
+    (prn
+      `(let [~@(mapcat (fn [[k v]] [k `'~v]) ctx)]
+          ~expr))
+    (super-unsafe-eval ; This won't work in CLJS I think.
+      `(let [~@(mapcat (fn [[k v]] [k `'~v]) ctx)]
+          ~expr)))
+
+  ; TODO: map onto a command like "vars" or "ls".
+  (defmacro local-context []
+    (prn :lc) ; DBG
+    (let [symbols (keys &env)]
+      (prn :local-context &env :keys (keys &env)) ; DBG
+      (zipmap (map (fn [sym] `(quote ~sym)) symbols) symbols)))
+
+  ; Use ::tl to continue.
+  ; TODO: Use the server so :repl/quit is respected.
+  (defn readr [prompt exit-code]
+    (let [input (clojure.main/repl-read prompt exit-code)]
+      (prn :readr :p prompt :ec exit-code) ; DBG
+      (if (= input ::tl) exit-code input)))
+
+  (defn knievel [expr]
+    (prn :eval :expr expr :ctx (local-context))
+    ;; (eval expr)
+    ;:done ; Just return
+
+    ; :eval :expr i :ctx {expr i}
+    ; Should this have i as a key also? Or that's sorted in the eval?
+
+    ; We're evaluating (clojure.core/let [expr (quote i)] i)
+
+    ; THE ISSUE IS IT NEVER EVEN TRIES TO EVALUATE IN contextual-eval, it fails before that.
+    ; Unable to resolve symbol: i in this context
+    (contextual-eval (local-context) expr)
+    )
+
+  ;; (def knievel (partial contextual-eval (local-context)))
+
+  (defn prompt [] (print "debug=> "))
+
+  (defmacro break []
+    `(clojure.main/repl :prompt prompt :eval knievel))
+    ;; `(clojure.main/repl :prompt prompt :read readr :eval evl))
 
   (def nesting-level (atom 0))
 
@@ -109,9 +212,16 @@ https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDr
 
   ;; repl-read respects :repl/quit
   (declare handle-error)
-  (defn start-nested-repl [e]
-    (println "Inspect e for details about the error.")
-    (clojure.main/repl :init #(def e e) :prompt (error-prompt e) :caught handle-error :read rs/repl-read))
+  (defmacro start-nested-repl [e]
+    `(do
+       (println "Inspect *e for details about the error.")
+       (clojure.main/repl
+        ;:init #(def ~'*e ~'e) ; WARNING: *e already refers to: #'clojure.core/*e in namespace: jakub-stastny.dev.repl,
+        ; being replaced by: #'jakub-stastny.dev.repl/*e
+        :prompt (error-prompt ~'e)
+        :caught handle-error
+        :eval (partial contextual-eval (local-context))
+        :read rs/repl-read)))
 
   (defn handle-error [e]
     (swap! nesting-level inc)
@@ -119,11 +229,37 @@ https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDr
     (start-nested-repl e)
     (swap! nesting-level dec))
 
+  (defn upgrade-init []
+    ;; Here we might do some requires like Clojure does:
+    ;; https://github.com/clojure/clojure/blob/master/src/clj/clojure/main.clj#L355
+    ;; I've seen a better approach for :eval to wrap the whole code in (do (require...) (code)) so it's available anywhere, although that can easily lead to code that works only in the REPL.
+    (rs/repl-init))
+
+  (defn upgrade-repl []
+    (clojure.main/repl
+     :caught #'handle-error
+     :prompt #(print (str "STANDARD." (ns-name *ns*) "=> "))
+     :print prn ; TODO pretty-print
+     :init #'upgrade-init
+     :read rs/repl-read))
+
+  ;; FIXME: *e is missing.
   (comment
-    (conj {} 1)
-    (ex-data e)
-    (ex-message e)
+    (upgrade-repl)
+
+    "value"
+    ,*1
+
+    ;; ExceptionInfo with data.
     (throw (ex-info "Fuck this" {:cant-be-bothered true}))
+    (ex-data *e)
+    (ex-message *e)
+
+    ;; Other exceptions.
+    (conj {} 1)
+    (ex-data *e)
+    (ex-message *e)
+
     :repl/quit
     ,)
 #+end_src
@@ -132,25 +268,6 @@ https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDr
 #+begin_src sh
   clojure -X:repl-server
   clojure -X:repl-server :port 1234
-#+end_src
-
-** Playground
-#+begin_src clojure :tangle src/playground.clj :mkdirp yes
-  (ns playground (:require [playground.repl :as pr]))
-
-  (comment
-    ;(pr/repl)
-
-    ; Get out of nested REPLs with exception context.
-    :repl/quit
-
-    (conj {} 1)
-    (throw (ex-info "Fuck this" {:cant-be-bothered true}))
-
-    ; This is the starting point for our playground.
-    (filter odd?)
-    (range 10)
-    ,)
 #+end_src
 
 ** Emacs integration
@@ -196,6 +313,27 @@ Of course it'd have to pretty-print it, not show the "real" {:tag ...} communica
 
 You could tweak what inf-clojure sends and that'd do. It'd still show the whole {:tag ...} thingy on receive, but whatevs.
 
+*** Stepping stone: find or make a nice & easy to use client for the socket REPL
+- Something like Pry in Ruby.
+- Start with plain socket REPL, upgrade to pREPL.
+- Show ~out~ in colours with ~=> ...~, distinguish ~out~.
+- SubREPL for ~err~.
+- Rescue from ~System/exit~.
+- Copy and paste from Emacs ~:'(~.
+  - We need something like ~copy-last-sexp~, ~copy-parent-form~ and ~copy-buffer~.
+
+**** TODO Verify it can run say ~clojure.inspector/inspect-tree~
+**** TODO What if you run the client out of Emacs
+Just send the forms to it. Shell in Emacs is pain and there are no colours (pretty-printing).
+
+That client would then have to communicate over a socket with Emacs (would be client/server at the same time).
+
+Or make the server pretty-print? Like if you don't care, here's your Emacs buffer, if it sucks to read, just try to read it in the console where the server prints it?
+
+YEAH TOTALLY, let the server do it (unless in production).
+
+EXCEPT the server provides UNUPGRADED REPL only!
+
 *** Take II: custom Emacs plugin
 **** Resources
 - Emacs EDN parser [[https://github.com/clojure-emacs/parseedn][parseedn]].
@@ -206,3 +344,60 @@ You could tweak what inf-clojure sends and that'd do. It'd still show the whole 
 
 **** Architecture
 - Start a normal socket REPL, upgrade to pREPL at the beginning of the client session.
+
+* Resources
+- Stuart Halloway: [[https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDrivenDevelopment.md][REPL-driven development]] (transcript).
+- LambdaIsland: [[https://lambdaisland.com/guides/clojure-repls/clojure-repls][Clojure REPLs]].
+- [[https://nextjournal.com/mk/rich-hickey-on-repls][Rich Hickey on REPLs]].
+- YouTube: [[https://www.youtube.com/watch?v=SrKj4hYic5A&embeds_euri=https%3A%2F%2Fnextjournal.com%2F&feature=emb_imp_woyt][Programming should eat itself]].
+
+* Notes
+- REPL already gives you ~*e~ for errors.
+
+#+begin_comment
+REPL Sean
+
+In a prod server, connect over SSH & inspect shit, occasionally patch the live process.
+REVEAL, cognitec rebel, portal
+add-lib
+tap> listen on queue
+
+@hiredman (coworker) uses minor-clj mode and socket repl
+
+https://clojure.github.io/clojure/clojure.inspector-api.html
+
+REPL CLJS
+
+https://www.youtube.com/watch?v=BZNJi5pP8fU&t=45s&ab_channel=MikeZamansky -> boils down to https://github.com/zamansky/shadow-cljs-demo/blob/master/src/main.cljs
+
+https://docs.cider.mx/cider-nrepl/usage.html
+https://docs.cider.mx/cider/index.html
+https://docs.cider.mx/cider/cljs/shadow-cljs.html
+https://shadow-cljs.github.io/docs/UsersGuide.html#cider
+
+I find myself repeating a lot of manual steps at the REPL for running my development environment.
+Consider creating a 'dev' namespace in your project (e.g myproject.dev) in which you define functions for automating common development tasks (for example: starting a local web server, running a database query, turning on/off email sending, etc.)
+(doto "test" prn)
+https://clojure.github.io/clojure/clojure.reflect-api.html#clojure.reflect/reflect
+
+To achieve this goal, I make the application itself into a transient object. Instead of the application being a singleton tied to a JVM process, I write code to construct instances of my application, possibly many of them within one JVM. Each time I make a change, I discard the old instance and construct a new one. The technique is similar to dealing with virtual machines in a cloud environment: rather than try to transition a VM from an old state to a new state, we simply discard the old one and spin up a new one.
+Designing applications this way requires discipline. First and foremost, all state must be local. Any global state, anywhere, breaks the whole model. Second, all resources acquired by the application instance must be carefully managed so that they can be released when the instance is destroyed.
+https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
+https://eli.thegreenplace.net/2017/notes-on-debugging-clojure-code/
+https://github.com/walmartlabs/system-viz
+https://docs.datomic.com/cloud/other-tools/REBL.html
+https://github.com/metasoarous/oz
+https://vlaaad.github.io/reveal/
+
+https://clojureverse.org/t/using-the-repl-with-reagent/3970/5
+
+It looks that the only cider can provide a good enough completion experience at the moment. I'd like to switch to inf-clojure + eglot.
+
+I’m interested in this sort of setup as well. I would hope eglot would provide the completions in that scenario. Maybe through corfu if desired
+#+end_comment
+
+if there is a file named user.clj at the root of the Java classpath, Clojure will load that file automatically when it starts.
+
+*** TODO Code reloading
+- Consider https://github.com/clojure/tools.namespace
+- https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
