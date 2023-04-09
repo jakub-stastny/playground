@@ -275,6 +275,8 @@ It'll get loaded automatically when we run ~clojure X:repl-server~ and it runs /
     ,)
 #+end_src
 
+/{{{highlight(If you want to get this code you have to tangle it using Org-mode's C-v t!)}}}/
+
 ** TODO Emacs pREPL
 The next step!
 
