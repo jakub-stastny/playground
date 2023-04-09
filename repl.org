@@ -71,7 +71,7 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
   (comment
     (start)
     app
-    (let [a "test"] (local-context))
+    (let [a :top-level] (let [b :nested] (local-context)))
     ,*2
     (macroexpand '(break'))
     (doseq [i [1 2 3]] (break)) ; Syntax error macroexpanding clojure.core/fn at (4:20).
@@ -156,11 +156,16 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
                              (keys &env)))
                ~form)))
 
+  (defn super-unsafe-eval-wrapper [form] (super-unsafe-eval form))
+
   ; From The joy of Clojure
   (defn contextual-eval [ctx expr]
     ;; (prn :ctx-ev :ctx ctx :e expr) ; DBG
     ; IT DOESN'T KNOW HOW TO SERIALISE THIS:
     ; chunk_328 #object[clojure.lang.ArrayChunk 0x6428591a "clojure.lang.ArrayChunk@6428591a"]
+    (prn :ctx-eval ; This won't work in CLJS I think.
+      `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
+          ~expr))
     (eval ; This won't work in CLJS I think.
       `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
           ~expr)))
@@ -172,20 +177,10 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
       ;; (prn :local-context &env :keys (keys &env)) ; DBG
       (zipmap (map (fn [sym] `(quote ~sym)) symbols) symbols)))
 
-  ; Use ::tl to continue.
-  ; TODO: Use the server so :repl/quit is respected.
-  (defn readr [prompt exit-code]
-    (let [input (clojure.main/repl-read prompt exit-code)]
-      (prn :readr :p prompt :ec exit-code) ; DBG
-      (if (= input ::tl) exit-code input)))
-
-  (defn prompt [] (print "debug=> "))
-
   ; Do NOT extract :eval into a method or the local-context will get lost.
   (defmacro break []
     `(do
-       (clojure.main/repl :prompt prompt :read readr :eval (partial contextual-eval (local-context)))))
-    ;; `(clojure.main/repl :prompt prompt :read readr :eval evl))
+       (clojure.main/repl :prompt #(print "debug=> ") :read rs/repl-read :eval (partial contextual-eval (local-context)))))
 
   (def nesting-level (atom 0))
 
@@ -201,17 +196,22 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
   (defmacro start-nested-repl [e]
     `(do
        (println "Inspect *e for details about the error.")
+       (prn :handle-error (type ~'e) :ctx (local-context)) ; DBG
        (clojure.main/repl
-        ;:init #(def ~'*e ~'e) ; WARNING: *e already refers to: #'clojure.core/*e in namespace: jakub-stastny.dev.repl,
+        ; FIXME: The def approach doesn't work for sub shell .... or does it???
+        :init #(def ~'*e ~'e) ; WARNING: *e already refers to: #'clojure.core/*e in namespace: jakub-stastny.dev.repl,
         ; being replaced by: #'jakub-stastny.dev.repl/*e
         :prompt (error-prompt ~'e)
         :caught handle-error
-        :eval (partial contextual-eval (local-context))
+        ;; :eval (partial contextual-eval (local-context))
+        ;; :eval super-unsafe-eval-wrapper
         :read rs/repl-read)))
 
   (defn handle-error [e]
+    (prn :handle-error (type e) :ctx (local-context)) ; DBG
     (swap! nesting-level inc)
     (println (ex-message e) (or (ex-data e) ""))
+    ;(prn :context (local-context)) ; e
     (start-nested-repl e)
     (swap! nesting-level dec))
 
