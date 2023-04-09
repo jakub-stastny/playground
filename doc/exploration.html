@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2023-04-09 Sun 11:24 -->
+<!-- 2023-04-09 Sun 11:30 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Emacs pPREPL exploration</title>
@@ -291,8 +291,8 @@ I haven't found any Emacs plugin that'd fit my needs. Which leads me to&#x2026;
 </div>
 </div>
 
-<div id="outline-container-org1e5a4c0" class="outline-2">
-<h2 id="org1e5a4c0"><span class="section-number-2">2.</span> Emacs pREPL</h2>
+<div id="outline-container-org6b832d5" class="outline-2">
+<h2 id="org6b832d5"><span class="section-number-2">2.</span> Emacs pREPL</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 I need a pREPL-based Emacs plugin that allows me to keep working in my code buffer and only switch to the split view with REPL <i>when</i> I want to use the REPL (such as when I add a breakpoint, more on it later). It should show the evaluation results (<code>C-x C-e</code> and the likes) in the source buffer temporarily, just like Cider does.
@@ -365,7 +365,13 @@ Say you have <code>(doseq [i [1 0]] (try-break (/ 1 i)))</code>. Run <code>C-x C
 <div id="outline-container-org8035a7c" class="outline-3">
 <h3 id="org8035a7c"><span class="section-number-3">3.1.</span> pREPL example</h3>
 <div class="outline-text-3" id="text-3-1">
+
+<div id="org2998875" class="figure">
+<p><img src="./assets/demo.png" alt="demo.png">
+</p>
 </div>
+</div>
+
 <div id="outline-container-org528e3f8" class="outline-4">
 <h4 id="org528e3f8"><span class="section-number-4">3.1.1.</span> Deps</h4>
 <div class="outline-text-4" id="text-3-1-1">
@@ -603,18 +609,12 @@ It'll get loaded automatically when we run <code>clojure X:repl-server</code> an
   ,)
 </pre>
 </div>
-
-
-<div id="org19bd00e" class="figure">
-<p><img src="./assets/demo.png" alt="demo.png">
-</p>
-</div>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org6b832d5" class="outline-3">
-<h3 id="org6b832d5"><span class="section-number-3">3.2.</span> <span class="todo TODO">TODO</span> Emacs pREPL</h3>
+<div id="outline-container-orge170e55" class="outline-3">
+<h3 id="orge170e55"><span class="section-number-3">3.2.</span> <span class="todo TODO">TODO</span> Emacs pREPL</h3>
 <div class="outline-text-3" id="text-3-2">
 <p>
 The next step!

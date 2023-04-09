@@ -80,6 +80,8 @@ Say you have ~(doseq [i [1 0]] (try-break (/ 1 i)))~. Run ~C-x C-e~ on it. Then 
 
 * Proof-of-concept
 ** pREPL example
+[[./assets/demo.png]]
+
 *** Deps
 #+begin_src clojure :tangle deps.edn
   {:paths ["src"]
@@ -272,8 +274,6 @@ It'll get loaded automatically when we run ~clojure X:repl-server~ and it runs /
     {:message (ex-message *e) :data (ex-data *e)}
     ,)
 #+end_src
-
-[[./assets/demo.png]]
 
 ** TODO Emacs pREPL
 The next step!
