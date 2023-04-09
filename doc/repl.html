@@ -3,10 +3,10 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2023-04-09 Sun 09:48 -->
+<!-- 2023-04-09 Sun 11:12 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>REPL-driven development</title>
+<title>&lrm;</title>
 <meta name="author" content="Jakub Šťastný" />
 <meta name="generator" content="Org Mode" />
 <style>
@@ -196,107 +196,10 @@
 </head>
 <body>
 <div id="content" class="content">
-<h1 class="title">REPL-driven development</h1>
-<div id="table-of-contents" role="doc-toc">
-<h2>Table of Contents</h2>
-<div id="text-table-of-contents" role="doc-toc">
-<ul>
-<li><a href="#org024648e">1. Resources</a></li>
-<li><a href="#org03348ad">2. Notes</a>
-<ul>
-<li>
-<ul>
-<li><a href="#org5af3ecd">2.0.1. <span class="todo TODO">TODO</span> Code reloading</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</div>
-</div>
-<blockquote>
-<p>
-With Lisp-based languages, the “unit of compilation” is a single, top-level form. Once the REPL has read in a single, well-formed “expression”, it can immediately compile it and then run it. The overall compilation and execution model for Clojure (and ClojureScript – with some caveats) is identical between the REPL and the “normal” command-line execution approach: read a form, compile it, execute it (and, in the REPL, print the result).
-</p>
-
-<p>
-With nearly all other languages, they are typically designed so the “unit of compilation” is a file (or module) and then if they have an interactive console for the language, it’s often a separate interpreter allowing for line-by-line (or statement-by-statement) reading and evaluation.
-</p>
-
-<p>
-For some languages, the interactive console reuses some of the same machinery that “normal” compilation/execution uses (for primarily interpreted languages). For compiled languages, the interactive console is a separate thing that often has some semantic differences and some limitations.
-</p>
-</blockquote>
-<p>
-By <a href="https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/2">@seancorfield</a>.
-</p>
-
-<blockquote>
-<p>
-I mentioned inspecting code already, but let me give an example here as well, you really want the REPL to auto-complete and show you the doc for various functions and global vars, that’s basic introspection, but it means the runtime must have first class doc-string and keep them around along the functions and the global vars, which again, isn’t something all languages do, like in Java, you need access to source files and you have to parse them to get the comment block above the corresponding methods to retrieve their doc, so it’s missing basic REPL introspection. Without that, again, a REPL is much less useful.
-</p>
-</blockquote>
-<p>
-By <a href="https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/8">@didibus</a>.
-</p>
-
-<blockquote>
-<p>
-A REPL is, by nature, a very sequential process: it reads, then evals, then prints, and then starts over. One REPL = One thread. Concurrency is achieved by having several REPLs.
-</p>
-</blockquote>
-
-<blockquote>
-<p>
-Even the simplest REPL still has the full power of Clojure in it! We can start with something very basic, like server.repl, send our own server’s code to it first thing after connecting, and then take control over stdin/stdout and start serving our own protocol with our own execution model.
-</p>
-
-<p>
-This is called “upgrading” your REPL and that’s how Christophe Grand’s Unrepl works, for example. The beauty of it is zero dependencies: you only need Clojure and nothing more. Everything you need you bring with you.
-</p>
-</blockquote>
-<p>
-From <a href="https://tonsky.me/blog/clojure-sublimed-3/">Clojure Sublimed 3</a>, <code>REPL, upgraded</code> section.
-</p>
-
-<div id="outline-container-org024648e" class="outline-2">
-<h2 id="org024648e"><span class="section-number-2">1.</span> Resources</h2>
-<div class="outline-text-2" id="text-1">
-<ul class="org-ul">
-<li>Stuart Halloway: <a href="https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDrivenDevelopment.md">REPL-driven development</a> (transcript).</li>
-<li>LambdaIsland: <a href="https://lambdaisland.com/guides/clojure-repls/clojure-repls">Clojure REPLs</a>.</li>
-<li><a href="https://nextjournal.com/mk/rich-hickey-on-repls">Rich Hickey on REPLs</a>.</li>
-<li>YouTube: <a href="https://www.youtube.com/watch?v=SrKj4hYic5A&amp;embeds_euri=https%3A%2F%2Fnextjournal.com%2F&amp;feature=emb_imp_woyt">Programming should eat itself</a>.</li>
-</ul>
-</div>
-</div>
-
-<div id="outline-container-org03348ad" class="outline-2">
-<h2 id="org03348ad"><span class="section-number-2">2.</span> Notes</h2>
-<div class="outline-text-2" id="text-2">
-<ul class="org-ul">
-<li>REPL already gives you <code>*e</code> for errors.</li>
-</ul>
-
-<p>
-if there is a file named user.clj at the root of the Java classpath, Clojure will load that file automatically when it starts.
-</p>
-</div>
-
-<div id="outline-container-org5af3ecd" class="outline-4">
-<h4 id="org5af3ecd"><span class="section-number-4">2.0.1.</span> <span class="todo TODO">TODO</span> Code reloading</h4>
-<div class="outline-text-4" id="text-2-0-1">
-<ul class="org-ul">
-<li>Consider <a href="https://github.com/clojure/tools.namespace">https://github.com/clojure/tools.namespace</a></li>
-<li><a href="https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded">https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded</a></li>
-</ul>
-</div>
-</div>
-</div>
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Jakub Šťastný</p>
-<p class="date">Created: 2023-04-09 Sun 09:48</p>
+<p class="date">Created: 2023-04-09 Sun 11:12</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>

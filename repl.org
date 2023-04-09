@@ -1,83 +1,193 @@
-#+TITLE: REPL-driven development
+# #+TITLE: REPL-driven development
 
-#+begin_quote
-  With Lisp-based languages, the “unit of compilation” is a single, top-level form. Once the REPL has read in a single, well-formed “expression”, it can immediately compile it and then run it. The overall compilation and execution model for Clojure (and ClojureScript – with some caveats) is identical between the REPL and the “normal” command-line execution approach: read a form, compile it, execute it (and, in the REPL, print the result).
+# #+begin_quote
+#   With Lisp-based languages, the “unit of compilation” is a single, top-level form. Once the REPL has read in a single, well-formed “expression”, it can immediately compile it and then run it. The overall compilation and execution model for Clojure (and ClojureScript – with some caveats) is identical between the REPL and the “normal” command-line execution approach: read a form, compile it, execute it (and, in the REPL, print the result).
 
-  With nearly all other languages, they are typically designed so the “unit of compilation” is a file (or module) and then if they have an interactive console for the language, it’s often a separate interpreter allowing for line-by-line (or statement-by-statement) reading and evaluation.
+#   With nearly all other languages, they are typically designed so the “unit of compilation” is a file (or module) and then if they have an interactive console for the language, it’s often a separate interpreter allowing for line-by-line (or statement-by-statement) reading and evaluation.
 
-  For some languages, the interactive console reuses some of the same machinery that “normal” compilation/execution uses (for primarily interpreted languages). For compiled languages, the interactive console is a separate thing that often has some semantic differences and some limitations.
-#+end_quote
-By [[https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/2][@seancorfield]].
+#   For some languages, the interactive console reuses some of the same machinery that “normal” compilation/execution uses (for primarily interpreted languages). For compiled languages, the interactive console is a separate thing that often has some semantic differences and some limitations.
+# #+end_quote
+# By [[https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/2][@seancorfield]].
 
-#+begin_quote
-  I mentioned inspecting code already, but let me give an example here as well, you really want the REPL to auto-complete and show you the doc for various functions and global vars, that’s basic introspection, but it means the runtime must have first class doc-string and keep them around along the functions and the global vars, which again, isn’t something all languages do, like in Java, you need access to source files and you have to parse them to get the comment block above the corresponding methods to retrieve their doc, so it’s missing basic REPL introspection. Without that, again, a REPL is much less useful.
-#+end_quote
-By [[https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/8][@didibus]].
+# #+begin_quote
+#   I mentioned inspecting code already, but let me give an example here as well, you really want the REPL to auto-complete and show you the doc for various functions and global vars, that’s basic introspection, but it means the runtime must have first class doc-string and keep them around along the functions and the global vars, which again, isn’t something all languages do, like in Java, you need access to source files and you have to parse them to get the comment block above the corresponding methods to retrieve their doc, so it’s missing basic REPL introspection. Without that, again, a REPL is much less useful.
+# #+end_quote
+# By [[https://clojureverse.org/t/why-other-languages-dont-have-repls-like-lisps/8640/8][@didibus]].
 
-#+begin_quote
-  A REPL is, by nature, a very sequential process: it reads, then evals, then prints, and then starts over. One REPL = One thread. Concurrency is achieved by having several REPLs.
-#+end_quote
+# #+begin_quote
+#   A REPL is, by nature, a very sequential process: it reads, then evals, then prints, and then starts over. One REPL = One thread. Concurrency is achieved by having several REPLs.
+# #+end_quote
 
-#+begin_quote
-  Even the simplest REPL still has the full power of Clojure in it! We can start with something very basic, like server.repl, send our own server’s code to it first thing after connecting, and then take control over stdin/stdout and start serving our own protocol with our own execution model.
+# #+begin_quote
+#   Even the simplest REPL still has the full power of Clojure in it! We can start with something very basic, like server.repl, send our own server’s code to it first thing after connecting, and then take control over stdin/stdout and start serving our own protocol with our own execution model.
 
-  This is called “upgrading” your REPL and that’s how Christophe Grand’s Unrepl works, for example. The beauty of it is zero dependencies: you only need Clojure and nothing more. Everything you need you bring with you.
-#+end_quote
-From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, upgraded~ section.
+#   This is called “upgrading” your REPL and that’s how Christophe Grand’s Unrepl works, for example. The beauty of it is zero dependencies: you only need Clojure and nothing more. Everything you need you bring with you.
+# #+end_quote
+# From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, upgraded~ section.
 
-* Resources
-- Stuart Halloway: [[https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDrivenDevelopment.md][REPL-driven development]] (transcript).
-- LambdaIsland: [[https://lambdaisland.com/guides/clojure-repls/clojure-repls][Clojure REPLs]].
-- [[https://nextjournal.com/mk/rich-hickey-on-repls][Rich Hickey on REPLs]].
-- YouTube: [[https://www.youtube.com/watch?v=SrKj4hYic5A&embeds_euri=https%3A%2F%2Fnextjournal.com%2F&feature=emb_imp_woyt][Programming should eat itself]].
+# ** Objectives
+# - Come up with a model for REPL-driven development that:
+#   - Provides ~(break)~ that starts a new sub-REPL in given point and gives access to the local context.
+#   - Starts a new sub-REPL automatically when an error is encountered and behaves like ~(break)~ does, but additionally giving access to the error object.
+#   - Sub-REPLs nests and each level can be quit using ~:repl/quit~.
+#   - Is based on the socket REPL, simplicity and extensibility rather than behind-the-scene magic.
+#   - Gets out of the way: my screen is small and all I want to look at is my code. ~C-x C-e~ displays results inline like Cider does. Only when needed (such as when an error is thrown), the REPL is brought forwards (probably a split view code/REPL is best).
+#   - Works in unsaved buffers. This is really important, as I work in Org mode files in "zoomed-in" mode (~C-c '~ when in a source block opens it in a new buffer which doesn't get saved until we zoom out of it, at which point its contents update the original source block). Having to zoom out and save constantly is a big pain and should only happen once I'm happy with the code block as such.
+#   - Is a suitable setup for production processes and not only development.
+#   - Allows hot-code patching in production if absolutely necessary.
 
-* Notes
-- REPL already gives you ~*e~ for errors.
+# * Resources
+# - Stuart Halloway: [[https://github.com/matthiasn/talk-transcripts/blob/master/Halloway_Stuart/REPLDrivenDevelopment.md][REPL-driven development]] (transcript).
+# - LambdaIsland: [[https://lambdaisland.com/guides/clojure-repls/clojure-repls][Clojure REPLs]].
+# - [[https://nextjournal.com/mk/rich-hickey-on-repls][Rich Hickey on REPLs]].
+# - YouTube: [[https://www.youtube.com/watch?v=SrKj4hYic5A&embeds_euri=https%3A%2F%2Fnextjournal.com%2F&feature=emb_imp_woyt][Programming should eat itself]].
 
-#+begin_comment
-REPL Sean
+# * Notes
+# - REPL already gives you ~*e~ for errors.
 
-In a prod server, connect over SSH & inspect shit, occasionally patch the live process.
-REVEAL, cognitec rebel, portal
-add-lib
-tap> listen on queue
+# #+begin_comment
+# REPL Sean
 
-@hiredman (coworker) uses minor-clj mode and socket repl
+# In a prod server, connect over SSH & inspect shit, occasionally patch the live process.
+# REVEAL, cognitec rebel, portal
+# add-lib
+# tap> listen on queue
 
-https://clojure.github.io/clojure/clojure.inspector-api.html
+# @hiredman (coworker) uses minor-clj mode and socket repl
 
-REPL CLJS
+# https://clojure.github.io/clojure/clojure.inspector-api.html
 
-https://www.youtube.com/watch?v=BZNJi5pP8fU&t=45s&ab_channel=MikeZamansky -> boils down to https://github.com/zamansky/shadow-cljs-demo/blob/master/src/main.cljs
+# REPL CLJS
 
-https://docs.cider.mx/cider-nrepl/usage.html
-https://docs.cider.mx/cider/index.html
-https://docs.cider.mx/cider/cljs/shadow-cljs.html
-https://shadow-cljs.github.io/docs/UsersGuide.html#cider
+# https://www.youtube.com/watch?v=BZNJi5pP8fU&t=45s&ab_channel=MikeZamansky -> boils down to https://github.com/zamansky/shadow-cljs-demo/blob/master/src/main.cljs
 
-I find myself repeating a lot of manual steps at the REPL for running my development environment.
-Consider creating a 'dev' namespace in your project (e.g myproject.dev) in which you define functions for automating common development tasks (for example: starting a local web server, running a database query, turning on/off email sending, etc.)
-(doto "test" prn)
-https://clojure.github.io/clojure/clojure.reflect-api.html#clojure.reflect/reflect
+# https://docs.cider.mx/cider-nrepl/usage.html
+# https://docs.cider.mx/cider/index.html
+# https://docs.cider.mx/cider/cljs/shadow-cljs.html
+# https://shadow-cljs.github.io/docs/UsersGuide.html#cider
 
-To achieve this goal, I make the application itself into a transient object. Instead of the application being a singleton tied to a JVM process, I write code to construct instances of my application, possibly many of them within one JVM. Each time I make a change, I discard the old instance and construct a new one. The technique is similar to dealing with virtual machines in a cloud environment: rather than try to transition a VM from an old state to a new state, we simply discard the old one and spin up a new one.
-Designing applications this way requires discipline. First and foremost, all state must be local. Any global state, anywhere, breaks the whole model. Second, all resources acquired by the application instance must be carefully managed so that they can be released when the instance is destroyed.
-https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
-https://eli.thegreenplace.net/2017/notes-on-debugging-clojure-code/
-https://github.com/walmartlabs/system-viz
-https://docs.datomic.com/cloud/other-tools/REBL.html
-https://github.com/metasoarous/oz
-https://vlaaad.github.io/reveal/
+# I find myself repeating a lot of manual steps at the REPL for running my development environment.
+# Consider creating a 'dev' namespace in your project (e.g myproject.dev) in which you define functions for automating common development tasks (for example: starting a local web server, running a database query, turning on/off email sending, etc.)
+# (doto "test" prn)
+# https://clojure.github.io/clojure/clojure.reflect-api.html#clojure.reflect/reflect
 
-https://clojureverse.org/t/using-the-repl-with-reagent/3970/5
+# To achieve this goal, I make the application itself into a transient object. Instead of the application being a singleton tied to a JVM process, I write code to construct instances of my application, possibly many of them within one JVM. Each time I make a change, I discard the old instance and construct a new one. The technique is similar to dealing with virtual machines in a cloud environment: rather than try to transition a VM from an old state to a new state, we simply discard the old one and spin up a new one.
+# Designing applications this way requires discipline. First and foremost, all state must be local. Any global state, anywhere, breaks the whole model. Second, all resources acquired by the application instance must be carefully managed so that they can be released when the instance is destroyed.
+# https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
+# https://eli.thegreenplace.net/2017/notes-on-debugging-clojure-code/
+# https://github.com/walmartlabs/system-viz
+# https://docs.datomic.com/cloud/other-tools/REBL.html
+# https://github.com/metasoarous/oz
+# https://vlaaad.github.io/reveal/
 
-It looks that the only cider can provide a good enough completion experience at the moment. I'd like to switch to inf-clojure + eglot.
+# https://clojureverse.org/t/using-the-repl-with-reagent/3970/5
 
-I’m interested in this sort of setup as well. I would hope eglot would provide the completions in that scenario. Maybe through corfu if desired
-#+end_comment
+# It looks that the only cider can provide a good enough completion experience at the moment. I'd like to switch to inf-clojure + eglot.
 
-if there is a file named user.clj at the root of the Java classpath, Clojure will load that file automatically when it starts.
+# I’m interested in this sort of setup as well. I would hope eglot would provide the completions in that scenario. Maybe through corfu if desired
+# #+end_comment
 
-*** TODO Code reloading
-- Consider https://github.com/clojure/tools.namespace
-- https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
+# if there is a file named user.clj at the root of the Java classpath, Clojure will load that file automatically when it starts.
+
+# *** TODO Code reloading
+# - Consider https://github.com/clojure/tools.namespace
+# - https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
+
+#   ; https://stackoverflow.com/questions/38183267/clojures-eval-does-not-see-local-symbols
+#   ; DOES &env get both a & b from (let [a :a] (let [b :b] (break))) ?
+#   (defmacro super-unsafe-eval
+#     "Like `eval`, but also exposes lexically-bound variables to eval. This
+#     is almost certainly a bad idea."
+#     [form]
+#     ;; (prn :SUE)
+#     ;; (prn :super-unsafe-eval `(eval (list 'let
+#     ;;                   ~(vec (mapcat #(vector `(quote ~%)
+#     ;;                                          `(list 'quote ~%))
+#     ;;                                 (keys &env)))
+#     ;;                   ~form)))
+#     `(eval (list 'let
+#                ~(vec (mapcat #(vector `(quote ~%)
+#                                       `(list 'quote ~%))
+#                              (keys &env)))
+#                ~form)))
+
+#   (defn super-unsafe-eval-wrapper [form] (super-unsafe-eval form))
+
+#   ; From The joy of Clojure
+#   (defn contextual-eval [ctx expr]
+#     ;; (prn :ctx-ev :ctx ctx :e expr) ; DBG
+#     ; IT DOESN'T KNOW HOW TO SERIALISE THIS:
+#     ; chunk_328 #object[clojure.lang.ArrayChunk 0x6428591a "clojure.lang.ArrayChunk@6428591a"]
+#     (prn :ctx-eval ; This won't work in CLJS I think.
+#       `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
+#           ~expr))
+#     (eval ; This won't work in CLJS I think.
+#       `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
+#           ~expr)))
+
+# ** Emacs integration
+# *** Take I: ~inf-clojure~
+# #+begin_src emacs-lisp :tangle .dir-locals.el
+#   ((nil
+#     (inf-clojure-custom-startup . "clojure -X:repl-server :port %d")
+#     ;(inf-clojure-custom-startup . ("localhost" . 5555))
+#     (inf-clojure-custom-repl-type . clojure)))
+# #+end_src
+
+# - Doc [[https://github.com/clojure-emacs/inf-clojure#startup][inf-clojure#startup]].
+# - Source [[https://github.com/clojure-emacs/inf-clojure/blob/master/inf-clojure.el][inf-clojure.el]].
+
+# **** TODO How to load a whole buffer?
+# /Reloading a namespace (via require :reload/require :reload-all)/
+
+# **** ISSUE
+# - Wouldn't work in Org narrowed source window.
+
+# **** WORKAROUND
+# - Open [[./src/playground.clj]].
+# - Start the REPL using ~inf-clojure-socket-repl~.
+# - Close the file.
+# - Go back to the Org file and work as normal.
+
+# **** Outcome
+# - Inf-clojure doesn't behave the way I want, in particular it forces me to work in split view at all times.
+# - Additionally things were broken and took time to debug.
+
+# *** Discussion: why is there no Emacs pREPL?
+# It seems like the way to go, why isn't there a plugin?
+
+# Scenario: the main process has 2 REPLs running, a socket REPL and another pREPL for Cider-like thingy.
+
+# ACTUALLY: then I'd loose my nested REPL interface, I wouldn't even know what's been happening.
+
+# OR NOT? Like it'd work under the hood, but how would it behave?
+
+# It could report exceptions same way Cider does C-x C-e at which point you open side-by-side and debug.
+
+# Of course it'd have to pretty-print it, not show the "real" {:tag ...} communication.
+
+# You could tweak what inf-clojure sends and that'd do. It'd still show the whole {:tag ...} thingy on receive, but whatevs.
+
+
+
+
+# *** Stepping stone: find or make a nice & easy to use client for the socket REPL
+# - Something like Pry in Ruby.
+# - Start with plain socket REPL, upgrade to pREPL.
+# - Show ~out~ in colours with ~=> ...~, distinguish ~out~.
+# - SubREPL for ~err~.
+# - Rescue from ~System/exit~.
+# - Copy and paste from Emacs ~:'(~.
+#   - We need something like ~copy-last-sexp~, ~copy-parent-form~ and ~copy-buffer~.
+
+# **** TODO Verify it can run say ~clojure.inspector/inspect-tree~
+# **** TODO What if you run the client out of Emacs
+# Just send the forms to it. Shell in Emacs is pain and there are no colours (pretty-printing).
+
+# That client would then have to communicate over a socket with Emacs (would be client/server at the same time).
+
+# Or make the server pretty-print? Like if you don't care, here's your Emacs buffer, if it sucks to read, just try to read it in the console where the server prints it?
+
+# YEAH TOTALLY, let the server do it (unless in production).
+
+# EXCEPT the server provides UNUPGRADED REPL only!

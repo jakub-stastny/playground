@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<!-- 2023-04-09 Sun 09:48 -->
+<!-- 2023-04-09 Sun 11:24 -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Emacs pPREPL exploration</title>
@@ -199,32 +199,176 @@
 <div id="content" class="content">
 <h1 class="title">Emacs pPREPL exploration</h1>
 
-<div id="outline-container-org64479f8" class="outline-2">
-<h2 id="org64479f8"><span class="section-number-2">1.</span> Objectives</h2>
+<div id="outline-container-orgbb13be0" class="outline-2">
+<h2 id="orgbb13be0"><span class="section-number-2">1.</span> Context</h2>
 <div class="outline-text-2" id="text-1">
+<p>
+I'm relatively new to Clojure and I'm looking for a REPL workflow that'd suit me.
+</p>
+
+<p>
+I was shocked to find out that the typical REPL workflow in Clojure does NOT include any subREPLs (since <i>typical</i> implies nREPL-based as of 2023). That's embarrassing in general, even more so given how much Clojure folks like to boast about RDD!
+</p>
+
+<p>
+What are subREPLs good for? Glad you asked:
+</p>
+</div>
+
+<div id="outline-container-org8db9048" class="outline-3">
+<h3 id="org8db9048"><span class="section-number-3">1.1.</span> Example: launching subREPL in a <code>catch</code> block</h3>
+<div class="outline-text-3" id="text-1-1">
+<div class="org-src-container">
+<pre class="src src-ruby"><span class="org-builtin">require</span> <span class="org-string">'pry'</span>
+
+<span class="org-keyword">begin</span>
+  local = <span class="org-string">"test"</span>
+  1 / 0
+<span class="org-keyword">rescue</span> <span class="org-type">Exception</span> =&gt; e
+  <span class="org-builtin">binding</span>.pry <span class="org-comment-delimiter"># </span><span class="org-comment">inspect local, e.</span>
+<span class="org-keyword">end</span>
+</pre>
+</div>
+
+<p>
+Translated to human speak, if an error happens, you'll get a subREPL that has access to that error object as well as to any local context at that point such as local variables.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgd46ef6b" class="outline-3">
+<h3 id="orgd46ef6b"><span class="section-number-3">1.2.</span> Example: launching subREPL in <code>reduce</code></h3>
+<div class="outline-text-3" id="text-1-2">
+<div class="org-src-container">
+<pre class="src src-ruby"><span class="org-builtin">require</span> <span class="org-string">'pry'</span>
+
+{<span class="org-constant">a:</span> 1, <span class="org-constant">b:</span> 2, <span class="org-constant">:c</span> 3}.reduce(0) <span class="org-keyword">do</span> |acc, (k, v)|
+  <span class="org-builtin">binding</span>.pry <span class="org-comment-delimiter"># </span><span class="org-comment">inspect acc, k v.</span>
+  acc + v
+<span class="org-keyword">end</span>
+</pre>
+</div>
+
+<p>
+These reduce blocks can get pretty complex rather tricky. Why I'm getting <code>v</code> of <code>:weird-value</code>? Let me inspect!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf35d572" class="outline-3">
+<h3 id="orgf35d572"><span class="section-number-3">1.3.</span> nREPL-based tools</h3>
+<div class="outline-text-3" id="text-1-3">
+<p>
+These were things I was routinely using when doing Ruby. Having them in Clojure is an absolute necessity for me. nREPL doesn't support subREPLs. That's a deal breaker for me, no matter how nice Cider is.
+</p>
+</div>
+</div>
+
+<div id="outline-container-orga63f0e7" class="outline-3">
+<h3 id="orga63f0e7"><span class="section-number-3">1.4.</span> Exploring <code>inf-clojure</code></h3>
+<div class="outline-text-3" id="text-1-4">
+<p>
+<code>inf-clojure</code> is a simple socket-REPL-based package for Emacs. The trouble is it's <i>too</i> simple: it has no idea what's being printed out to STDOUT/STDERR and what's the return value.
+</p>
+
+<p>
+Do I care? I wouldn't, except that it has a very serious impact on my workflow: it forces me to have my code open constantly in a split view with a REPL by its side.
+</p>
+
+<p>
+I use MacBook Air. It's got 13" screen. Plus I like to use a large font (~18pt). My whole screen is around 120 characters. There's no chance in hell I'm going to make that some measly 60!
+</p>
+</div>
+</div>
+
+<div id="outline-container-orgf0882e3" class="outline-3">
+<h3 id="orgf0882e3"><span class="section-number-3">1.5.</span> Conclusion</h3>
+<div class="outline-text-3" id="text-1-5">
+<p>
+I haven't found any Emacs plugin that'd fit my needs. Which leads me to&#x2026;
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org1e5a4c0" class="outline-2">
+<h2 id="org1e5a4c0"><span class="section-number-2">2.</span> Emacs pREPL</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+I need a pREPL-based Emacs plugin that allows me to keep working in my code buffer and only switch to the split view with REPL <i>when</i> I want to use the REPL (such as when I add a breakpoint, more on it later). It should show the evaluation results (<code>C-x C-e</code> and the likes) in the source buffer temporarily, just like Cider does.
+</p>
+</div>
+
+<div id="outline-container-orgf42b579" class="outline-3">
+<h3 id="orgf42b579"><span class="section-number-3">2.1.</span> Clojurians Slack announcement in <code>#emacs</code></h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+At this stage I'm 100% decided I'm doing it and I'm doing exploratory works, so far just in terms of the desired workflow:
+</p>
+
 <ul class="org-ul">
-<li>Come up with a model for REPL-driven development that:
-<ul class="org-ul">
-<li>Provides <code>(break)</code> that starts a new sub-REPL in given point and gives access to the local context.</li>
-<li>Starts a new sub-REPL automatically when an error is encountered and behaves like <code>(break)</code> does, but additionally giving access to the error object.</li>
-<li>Sub-REPLs nests and each level can be quit using <code>:repl/quit</code>.</li>
-<li>Is based on the socket REPL, simplicity and extensibility rather than behind-the-scene magic.</li>
-<li>Gets out of the way: my screen is small and all I want to look at is my code. <code>C-x C-e</code> displays results inline like Cider does. Only when needed (such as when an error is thrown), the REPL is brought forwards (probably a split view code/REPL is best).</li>
-<li>Works in unsaved buffers. This is really important, as I work in Org mode files in "zoomed-in" mode (<code>C-c '</code> when in a source block opens it in a new buffer which doesn't get saved until we zoom out of it, at which point its contents update the original source block). Having to zoom out and save constantly is a big pain and should only happen once I'm happy with the code block as such.</li>
-<li>Is a suitable setup for production processes and not only development.</li>
-<li>Allows hot-code patching in production if absolutely necessary.</li>
-</ul></li>
+<li>I have <code>(doseq [i [1 0]] (break) (/ 1 i))</code> working (<code>:repl/quit</code> or <code>C-d</code> quits the breakpoint and make it proceed to the next expression.</li>
+<li>Starting subREPLs automatically on error is fun when typing into the REPL, but useless for Emacs, as any error would mean having to switch to the REPL buffer and send <code>:repl/quit</code>. That'd get old pretty bloody fast.</li>
+<li>So instead one would set manually when they want to drop into a subREPL using something akin to <code>(doseq [i [1 0]] (try (/ 1 i) (catch Exception e (break))))</code>. I already have a macro for it, so it boils down to <code>(doseq [i [1 0]] (try-break (/ 1 i)))</code>. You do have access to the value of i there obviously, that's the whole point of this little exercise!</li>
 </ul>
+
+<p>
+Obviously this would just come as an optional utils library, anyone's free to use whatever they please!
+</p>
+
+<p>
+Now I think this is a good starting point for me to actually start diving into the Elisp part (next weekend?). I know feck all about Elisp (whopsie!), which is why I'd really appreciate someone joining me in this endeavour, but one way or the other, it's a tool I want and need and it's gotta happen <i>sí o sí</i>.
+</p>
+
+<p>
+I'm also working full-time, so the timeline is in the air, but either way it's high priority thing for me (also subject to how badly do I need it in my work).
+</p>
+
+<p>
+The initial version will concentrate on one single thing: making <code>C-x C-e</code> (eval last sexp) work with displaying result in the source buffer temporarily, just like Cider does with a caveat:
+</p>
+<ul class="org-ul">
+<li>STDOUT/STDERR will <i>only</i> get shown in the REPL buffer itself.</li>
+<li>Return value will get shown in the source buffer Cider-style.</li>
+<li>Any error will also get shown in the source error (something like <code>#error {:message (ex-message *e)}</code> possibly also with <code>:data (ex-data *e)</code>, although that might require some truncating, whatever.</li>
+</ul>
+
+<p>
+That way I know if the code I'm working on works and if not, the short message summary is usually enough to know what the problem is, if not, go play in the REPL buffer to find out (inspect <code>*e</code> or add a <code>(break)</code>).
+</p>
+
+<p>
+Unlike in Cider this workflow would require some typing into the REPL. Right, that's why we start the bloody subREPLs in the first place, so we can go and inspect what's going on there.
+</p>
+
+<p>
+Say you have <code>(doseq [i [1 0]] (try-break (/ 1 i)))</code>. Run <code>C-x C-e</code> on it. Then you have to switch to the REPL and do whatever you gotta do! Inspecting the value of <code>i</code> typically. When done, <code>:repl/quit</code> or <code>C-d</code> to move on.
+</p>
+</div>
+</div>
+
+<div id="outline-container-org9fde120" class="outline-3">
+<h3 id="org9fde120"><span class="section-number-3">2.2.</span> Request for involvement</h3>
+<div class="outline-text-3" id="text-2-2">
+<ul class="org-ul">
+<li>I appreciate any feedback esp. regarding the workflow. What works for you? What am I missing? This is the bread and butter of the Clojure dev experience and I want it to work well.</li>
+<li>Early testers? Contributors?</li>
+</ul>
+</div>
 </div>
 </div>
 
 <div id="outline-container-org3512ca5" class="outline-2">
-<h2 id="org3512ca5"><span class="section-number-2">2.</span> Proof-of-concept</h2>
-<div class="outline-text-2" id="text-2">
+<h2 id="org3512ca5"><span class="section-number-2">3.</span> Proof-of-concept</h2>
+<div class="outline-text-2" id="text-3">
 </div>
-<div id="outline-container-org528e3f8" class="outline-3">
-<h3 id="org528e3f8"><span class="section-number-3">2.1.</span> Deps</h3>
-<div class="outline-text-3" id="text-2-1">
+<div id="outline-container-org8035a7c" class="outline-3">
+<h3 id="org8035a7c"><span class="section-number-3">3.1.</span> pREPL example</h3>
+<div class="outline-text-3" id="text-3-1">
+</div>
+<div id="outline-container-org528e3f8" class="outline-4">
+<h4 id="org528e3f8"><span class="section-number-4">3.1.1.</span> Deps</h4>
+<div class="outline-text-4" id="text-3-1-1">
 <div class="org-src-container">
 <pre class="src src-clojure">{<span class="org-clojure-keyword">:paths</span> [<span class="org-string">"src"</span>]
  <span class="org-clojure-keyword">:aliases</span>
@@ -238,65 +382,40 @@
                <span class="org-clojure-keyword">:server-daemon</span> <span class="org-constant">false</span>}}}}
 </pre>
 </div>
+</div>
 
-<ul class="org-ul">
-<li><b>Ref:</b> <a href="https://clojure.org/guides/deps_and_cli#socket_repl">Deps and CLI guide: socket REPL</a>.</li>
-<li><a href="https://github.com/clojure/clojure/blob/38524061dcb14c598c239be87184b3378ffc5bac/src/clj/clojure/main.clj#L368">clojure.main/repl</a>.</li>
-</ul>
-
+<div id="outline-container-org3873c7c" class="outline-5">
+<h5 id="org3873c7c"><span class="section-number-5">3.1.1.1.</span> Usage</h5>
+<div class="outline-text-5" id="text-3-1-1-1">
 <div class="org-src-container">
-<pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">user</span>
-  <span class="org-doc">"This gets loaded automatically before the server starts."</span>
-  (<span class="org-clojure-keyword">:require</span> [jakub-stastny.dev.repl <span class="org-clojure-keyword">:refer</span> (upgrade-repl local-context break try-break ls)]))
-
-(<span class="org-keyword">defn</span> <span class="org-function-name">start</span> []
-  (<span class="org-keyword">def</span> <span class="org-variable-name">app</span> {<span class="org-clojure-keyword">:start-time</span> (<span class="org-keyword">new</span> java.util.Date)}) <span class="org-comment">; Or (System/currentTimeMillis)</span>
-  (println <span class="org-string">"Standard REPL started."</span>)
-  (println <span class="org-string">"Additional helpers: local-context &amp; break."</span>)
-  (println)
-  (println <span class="org-string">"app:"</span> (pr-str app))
-  (println)
-  (upgrade-repl))
-
-(<span class="org-keyword">comment</span>
-  (start)
-  app
-  (<span class="org-keyword">let</span> [a <span class="org-clojure-keyword">:top-level</span>] (<span class="org-keyword">let</span> [b <span class="org-clojure-keyword">:nested</span>] (local-context)))
-  <span class="org-builtin">*2</span>
-  (<span class="org-keyword">doseq</span> [i [1 0]] (break) (/ 1 i))
-
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">ExceptionInfo with data.</span>
-  (<span class="org-keyword">throw</span> (ex-info <span class="org-string">"Fuck this"</span> {<span class="org-clojure-keyword">:cant-be-bothered</span> <span class="org-constant">true</span>}))
-  <span class="org-builtin">*e</span>
-  app
-  (local-context)
-  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
-
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">Other exceptions.</span>
-  (conj {} 1)
-  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
-
-  <span class="org-comment">; Get out of nested REPLs with exception context.</span>
-  <span class="org-clojure-keyword">:</span><span class="org-type">repl</span><span class="org-default">/</span><span class="org-clojure-keyword">quit</span>
-  ,)
-
+<pre class="src src-sh">clojure -X:repl-server
+clojure -X:repl-server :port 1234
 </pre>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org40176b4" class="outline-3">
-<h3 id="org40176b4"><span class="section-number-3">2.2.</span> REPL server</h3>
-<div class="outline-text-3" id="text-2-2">
+<div id="outline-container-org53747c1" class="outline-5">
+<h5 id="org53747c1"><span class="section-number-5">3.1.1.2.</span> Refs</h5>
+<div class="outline-text-5" id="text-3-1-1-2">
+<ul class="org-ul">
+<li><a href="https://clojure.org/guides/deps_and_cli#socket_repl">Deps and CLI guide: socket REPL</a>.</li>
+<li><a href="https://github.com/clojure/clojure/blob/38524061dcb14c598c239be87184b3378ffc5bac/src/clj/clojure/main.clj#L368">clojure.main/repl</a>.</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org40176b4" class="outline-4">
+<h4 id="org40176b4"><span class="section-number-4">3.1.2.</span> REPL server</h4>
+<div class="outline-text-4" id="text-3-1-2">
 <div class="org-src-container">
 <pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">jakub-stastny.dev.repl.server</span>
-  (<span class="org-clojure-keyword">:require</span> [clojure.core.server <span class="org-clojure-keyword">:as</span> s]))
+  (<span class="org-clojure-keyword">:require</span> [clojure.core.server <span class="org-clojure-keyword">:as</span> rs]))
 
 (<span class="org-keyword">defn</span> <span class="org-function-name">repl</span> []
-  (<span class="org-type">clojure.main</span>/repl
-   <span class="org-clojure-keyword">:prompt</span> #(print (str <span class="org-string">"host.socket.repl."</span> (ns-name <span class="org-builtin">*ns*</span>) <span class="org-string">"=&gt; "</span>))
-   <span class="org-clojure-keyword">:init</span> <span class="org-type">s</span>/repl-init
-   <span class="org-clojure-keyword">:read</span> <span class="org-type">s</span>/repl-read))
+  (<span class="org-type">clojure.main</span>/repl <span class="org-clojure-keyword">:init</span> <span class="org-type">rs</span>/repl-init <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read
+                     <span class="org-clojure-keyword">:prompt</span> #(print (str <span class="org-string">"base-repl::"</span> (ns-name <span class="org-builtin">*ns*</span>) <span class="org-string">"=&gt; "</span>))))
 
 (<span class="org-keyword">defn</span> <span class="org-function-name">start-server</span> [{<span class="org-clojure-keyword">:keys</span> [port] <span class="org-clojure-keyword">:as</span> opts}]
   (println (str <span class="org-string">"~ Starting socket REPL on port "</span> port <span class="org-string">"."</span>))
@@ -310,11 +429,10 @@
   (println)
   (println      <span class="org-string">"There's also javadoc from clojure.java.javadoc and pp &amp; pprint from clojure.pprint."</span>)
   (println)
-  (println      <span class="org-string">"This is the base REPL, you'll probably want to upgrade it by running (start)."</span>)
+  (println      <span class="org-string">"This is the base REPL. If you're in dev, you can upgrade it by running (start)."</span>)
   (println)
 
-  <span class="org-comment">; We have to print the prompt or inf-clojure won't recognise the REPL server being ready.</span>
-  (<span class="org-keyword">future</span> (<span class="org-type">s</span>/start-server opts))
+  (<span class="org-keyword">future</span> (<span class="org-type">rs</span>/start-server opts))
   (repl)
 
   <span class="org-comment">; Without this, :repl/quit or C-d won't exit the socket server.</span>
@@ -322,22 +440,13 @@
 </pre>
 </div>
 </div>
-
-<div id="outline-container-org4d2839f" class="outline-4">
-<h4 id="org4d2839f"><span class="section-number-4">2.2.1.</span> <span class="todo TODO">TODO</span> Recover from C-c</h4>
-<div class="outline-text-4" id="text-2-2-1">
-<p>
-<a href="https://clojuredocs.org/clojure.repl/set-break-handler">https://clojuredocs.org/clojure.repl/set-break-handler</a>!
-</p>
-</div>
 </div>
 
-<div id="outline-container-org3f82d30" class="outline-4">
-<h4 id="org3f82d30"><span class="section-number-4">2.2.2.</span> <span class="todo TODO">TODO</span> Upgrade to pREPL in <code>(start)</code></h4>
-<div class="outline-text-4" id="text-2-2-2">
+<div id="outline-container-orgd078955" class="outline-4">
+<h4 id="orgd078955"><span class="section-number-4">3.1.3.</span> Enhanced REPL</h4>
+<div class="outline-text-4" id="text-3-1-3">
 <p>
-<a href="https://github.com/jackrusher/scimacs">https://github.com/jackrusher/scimacs</a>
-<a href="https://github.com/borkdude/clj2el">https://github.com/borkdude/clj2el</a>
+Tools for dealing with pREPL.
 </p>
 
 <div class="org-src-container">
@@ -347,6 +456,7 @@
    [clojure.core.server <span class="org-clojure-keyword">:as</span> rs]
    [puget.printer <span class="org-clojure-keyword">:as</span> puget]))
 
+<span class="org-comment-delimiter">; </span><span class="org-comment">This wouldn't be in the Emacs version, obviously.</span>
 (<span class="org-keyword">def</span> <span class="org-variable-name">colours</span> {<span class="org-clojure-keyword">:red</span> 31 <span class="org-clojure-keyword">:green</span> 32 <span class="org-clojure-keyword">:yellow</span> 33
             <span class="org-clojure-keyword">:blue</span> 34 <span class="org-clojure-keyword">:purple</span> 35 <span class="org-clojure-keyword">:cyan</span> 36 <span class="org-clojure-keyword">:grey</span> 37})
 
@@ -354,56 +464,15 @@
   (<span class="org-keyword">if-let</span> [colour-code (colours colour)]
     (str <span class="org-string">"</span><span class="org-string"><span class="org-bold">\0</span></span><span class="org-string">33["</span> colour-code <span class="org-string">"m"</span> text <span class="org-string">"</span><span class="org-string"><span class="org-bold">\0</span></span><span class="org-string">33[0m"</span>) text))
 
-<span class="org-comment-delimiter">; </span><span class="org-comment">https://stackoverflow.com/questions/38183267/clojures-eval-does-not-see-local-symbols</span>
-<span class="org-comment-delimiter">; </span><span class="org-comment">DOES &amp;env get both a &amp; b from (let [a :a] (let [b :b] (break))) ?</span>
-(<span class="org-keyword">defmacro</span> <span class="org-function-name">super-unsafe-eval</span>
-  <span class="org-doc">"Like `</span><span class="org-doc"><span class="org-constant">eval</span></span><span class="org-doc">`, but also exposes lexically-bound variables to eval. This</span>
-<span class="org-doc">  is almost certainly a bad idea."</span>
-  [form]
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :SUE)</span>
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :super-unsafe-eval `(eval (list 'let</span>
-  <span class="org-comment-delimiter">;;                   </span><span class="org-comment">~(vec (mapcat #(vector `(quote ~%)</span>
-  <span class="org-comment-delimiter">;;                                          </span><span class="org-comment">`(list 'quote ~%))</span>
-  <span class="org-comment-delimiter">;;                                 </span><span class="org-comment">(keys &amp;env)))</span>
-  <span class="org-comment-delimiter">;;                   </span><span class="org-comment">~form)))</span>
-  `(eval (list 'let
-             ~(vec (mapcat #(vector `(<span class="org-keyword">quote</span> ~<span class="org-variable-name">%</span>)
-                                    `(list 'quote ~<span class="org-variable-name">%</span>))
-                           (keys &amp;env)))
-             ~form)))
-
-(<span class="org-keyword">defn</span> <span class="org-function-name">super-unsafe-eval-wrapper</span> [form] (super-unsafe-eval form))
-
-<span class="org-comment-delimiter">; </span><span class="org-comment">From The joy of Clojure</span>
-(<span class="org-keyword">defn</span> <span class="org-function-name">contextual-eval</span> [ctx expr]
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :ctx-ev :ctx ctx :e expr) ; DBG</span>
-  <span class="org-comment">; IT DOESN'T KNOW HOW TO SERIALISE THIS:</span>
-  <span class="org-comment">; chunk_328 #object[clojure.lang.ArrayChunk 0x6428591a "clojure.lang.ArrayChunk@6428591a"]</span>
-  (prn <span class="org-clojure-keyword">:ctx-eval</span> <span class="org-comment">; This won't work in CLJS I think.</span>
-    `(<span class="org-keyword">let</span> [~@(mapcat (<span class="org-keyword">fn</span> [[k v]] [k `'~v]) (filter (<span class="org-keyword">fn</span> [[k v]] (not (.startsWith (str k) <span class="org-string">"chunk"</span>))) ctx))]
-        ~expr))
-  (eval <span class="org-comment">; This won't work in CLJS I think.</span>
-    `(<span class="org-keyword">let</span> [~@(mapcat (<span class="org-keyword">fn</span> [[k v]] [k `'~v]) (filter (<span class="org-keyword">fn</span> [[k v]] (not (.startsWith (str k) <span class="org-string">"chunk"</span>))) ctx))]
-        ~expr)))
-
 <span class="org-comment-delimiter">; </span><span class="org-comment">@phronmophobic:</span>
 <span class="org-comment-delimiter">; </span><span class="org-comment">Instead of embedding the values, I would use eval to create a function and call it:</span>
 <span class="org-comment-delimiter">; </span><span class="org-comment">You can also do something like save the values in a dynamic variable and then grab the values inside of the eval from the dynamic variable, but I think wrapping in a function is more explicit and less brittle.</span>
-(<span class="org-keyword">defn</span> <span class="org-function-name">contextual-eval-2</span> [ctx expr]
-  (<span class="org-keyword">let</span> [f
-        (eval
-         `(<span class="org-keyword">fn</span> [~@(keys ctx)]
-            ~expr))]
+(<span class="org-keyword">defn</span> <span class="org-function-name">contextual-eval</span> [ctx expr]
+  (<span class="org-keyword">let</span> [f (eval `(<span class="org-keyword">fn</span> [~@(keys ctx)] ~expr))]
     (apply f (vals ctx))))
 
-(prn <span class="org-clojure-keyword">:ctx-evl-2</span> (contextual-eval-2 {'a (Exception. <span class="org-string">"hi"</span>) 'b 2}
-                   '(str (.getMessage a) <span class="org-string">" "</span> b)))
-
-<span class="org-comment-delimiter">; </span><span class="org-comment">TODO: map onto a command like "vars" or "ls".</span>
 (<span class="org-keyword">defmacro</span> <span class="org-function-name">local-context</span> []
-  <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :lc) ; DBG</span>
   (<span class="org-keyword">let</span> [symbols (keys &amp;env)]
-    <span class="org-comment-delimiter">;; </span><span class="org-comment">(prn :local-context &amp;env :keys (keys &amp;env)) ; DBG</span>
     (zipmap (map (<span class="org-keyword">fn</span> [sym] `(<span class="org-keyword">quote</span> ~sym)) symbols) symbols)))
 
 <span class="org-comment-delimiter">; </span><span class="org-comment">Do NOT extract :eval into a method or the local-context will get lost.</span>
@@ -412,11 +481,10 @@
      (<span class="org-type">clojure.main</span>/repl
       <span class="org-clojure-keyword">:prompt</span> #(print (colour <span class="org-clojure-keyword">:cyan</span> <span class="org-string">"debug=&gt; "</span>))
       <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read
-      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval-2 (local-context))
+      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval (local-context))
       <span class="org-clojure-keyword">:print</span> prn <span class="org-comment-delimiter">;; </span><span class="org-comment">puget.pprint</span>
       )))
 
-<span class="org-comment-delimiter">;; </span><span class="org-comment">(doseq [i [1 0]] (try-break (/ 1 i)))</span>
 (<span class="org-keyword">defmacro</span> <span class="org-function-name">try-break</span> [expr]
   `(<span class="org-keyword">try</span> ~expr (<span class="org-keyword">catch</span> Exception ~'<span class="org-builtin">*e</span> (break))))
 
@@ -440,8 +508,7 @@
      (<span class="org-type">clojure.main</span>/repl
       <span class="org-clojure-keyword">:prompt</span> (error-prompt ~'<span class="org-builtin">*e</span>)
       <span class="org-clojure-keyword">:caught</span> handle-error
-      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval-2 (local-context))
-      <span class="org-comment-delimiter">;; </span><span class="org-comment">:eval super-unsafe-eval-wrapper</span>
+      <span class="org-clojure-keyword">:eval</span> (partial contextual-eval (local-context))
       <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read
       <span class="org-clojure-keyword">:print</span> prn <span class="org-comment-delimiter">;; </span><span class="org-comment">puget.pprint</span>
       )))
@@ -449,7 +516,6 @@
 (<span class="org-keyword">defn</span> <span class="org-function-name">handle-error</span> [<span class="org-builtin">*e</span>]
   (swap! nesting-level inc)
   (println (ex-message <span class="org-builtin">*e</span>) (<span class="org-keyword">or</span> (ex-data <span class="org-builtin">*e</span>) <span class="org-string">""</span>))
-  <span class="org-comment">;(prn :context (local-context)) ; e</span>
   (start-nested-repl <span class="org-builtin">*e</span>)
   (swap! nesting-level dec))
 
@@ -459,7 +525,7 @@
   <span class="org-comment-delimiter">;; </span><span class="org-comment">I've seen a better approach for :eval to wrap the whole code in (do (require...) (code)) so it's available anywhere, although that can easily lead to code that works only in the REPL.</span>
   (<span class="org-type">rs</span>/repl-init))
 
-<span class="org-comment-delimiter">; </span><span class="org-comment">This REPL is meant to be used as Pry in Ruby, not in Emacs, for that we will use pREPL later.</span>
+<span class="org-comment-delimiter">; </span><span class="org-comment">This REPL is meant to be used as Pry in Ruby.</span>
 (<span class="org-keyword">defn</span> <span class="org-function-name">upgrade-repl</span> []
   (<span class="org-type">clojure.main</span>/repl
    <span class="org-clojure-keyword">:caught</span> #'handle-error
@@ -467,209 +533,111 @@
    <span class="org-clojure-keyword">:print</span> prn <span class="org-comment">; TODO pretty-print</span>
    <span class="org-clojure-keyword">:init</span> #'upgrade-init
    <span class="org-clojure-keyword">:read</span> <span class="org-type">rs</span>/repl-read))
+</pre>
+</div>
+</div>
 
-<span class="org-comment-delimiter">;; </span><span class="org-comment">FIXME: *e is missing.</span>
+<div id="outline-container-org4d2839f" class="outline-5">
+<h5 id="org4d2839f"><span class="section-number-5">3.1.3.1.</span> <span class="todo TODO">TODO</span> Recover from C-c</h5>
+<div class="outline-text-5" id="text-3-1-3-1">
+<ul class="org-ul">
+<li>See <a href="https://clojuredocs.org/clojure.repl/set-break-handler!">clojure.repl/set-break-handler!</a>.</li>
+</ul>
+</div>
+</div>
+
+<div id="outline-container-org3f82d30" class="outline-5">
+<h5 id="org3f82d30"><span class="section-number-5">3.1.3.2.</span> <span class="todo TODO">TODO</span> Upgrade to pREPL in <code>(start)</code></h5>
+</div>
+</div>
+
+<div id="outline-container-org61724b4" class="outline-4">
+<h4 id="org61724b4"><span class="section-number-4">3.1.4.</span> User: our starting point</h4>
+<div class="outline-text-4" id="text-3-1-4">
+<p>
+This will serve us as a playground, let's pretend this is the project we're working on.
+</p>
+
+<p>
+Start a normal socket REPL, upgrade to pREPL at the beginning of the client session.
+</p>
+
+<p>
+It'll get loaded automatically when we run <code>clojure X:repl-server</code> and it runs <i>before</i> the server starts.
+</p>
+
+<div class="org-src-container">
+<pre class="src src-clojure">(<span class="org-keyword">ns</span> <span class="org-type">user</span>
+  (<span class="org-clojure-keyword">:require</span> [jakub-stastny.dev.repl <span class="org-clojure-keyword">:refer</span> (upgrade-repl break try-break ls)]))
+
+(<span class="org-keyword">defn</span> <span class="org-function-name">start</span> []
+  <span class="org-comment">; http://thinkrelevance.com/blog/2013/06/04/clojure-workflow-reloaded</span>
+  (<span class="org-keyword">def</span> <span class="org-variable-name">app</span> {<span class="org-clojure-keyword">:start-time</span> (<span class="org-keyword">new</span> java.util.Date)}) <span class="org-comment">; Or (System/currentTimeMillis)</span>
+
+  (println <span class="org-string">"Fancy REPL started."</span>)
+  (println <span class="org-string">"Additional helpers: ls, break &amp; try-break."</span>)
+  (println)
+  (println <span class="org-string">"app:"</span> (pr-str app))
+  (println)
+  (upgrade-repl))
+
 (<span class="org-keyword">comment</span>
-  (upgrade-repl)
+  (start)
 
-  <span class="org-string">"value"</span>
-  <span class="org-builtin">*1</span>
+  <span class="org-comment">; Show local context.</span>
+  (<span class="org-keyword">let</span> [a <span class="org-clojure-keyword">:b</span>] (<span class="org-keyword">let</span> [b <span class="org-clojure-keyword">:c</span>] (ls)))
+
+  (<span class="org-keyword">doseq</span> [i [1 0]] (break) (/ 1 i)) <span class="org-comment">; Use :repl/quit or C-d to continue.</span>
+  (<span class="org-keyword">doseq</span> [i [1 0]] (try-break (/ 1 i)))
 
   <span class="org-comment-delimiter">;; </span><span class="org-comment">ExceptionInfo with data.</span>
-  (<span class="org-keyword">throw</span> (ex-info <span class="org-string">"Fuck this"</span> {<span class="org-clojure-keyword">:cant-be-bothered</span> <span class="org-constant">true</span>}))
-  (ex-data <span class="org-builtin">*e</span>)
-  (ex-message <span class="org-builtin">*e</span>)
+  (<span class="org-keyword">throw</span> (ex-info <span class="org-string">"Error"</span> {<span class="org-clojure-keyword">:tired</span> <span class="org-constant">true</span>}))
+  <span class="org-builtin">*e</span>
+
+  (ls)
+  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
 
   <span class="org-comment-delimiter">;; </span><span class="org-comment">Other exceptions.</span>
   (conj {} 1)
-  (ex-data <span class="org-builtin">*e</span>)
-  (ex-message <span class="org-builtin">*e</span>)
-
-  <span class="org-clojure-keyword">:</span><span class="org-type">repl</span><span class="org-default">/</span><span class="org-clojure-keyword">quit</span>
+  {<span class="org-clojure-keyword">:message</span> (ex-message <span class="org-builtin">*e</span>) <span class="org-clojure-keyword">:data</span> (ex-data <span class="org-builtin">*e</span>)}
   ,)
 </pre>
 </div>
+
+
+<div id="org19bd00e" class="figure">
+<p><img src="./assets/demo.png" alt="demo.png">
+</p>
+</div>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org3873c7c" class="outline-3">
-<h3 id="org3873c7c"><span class="section-number-3">2.3.</span> Usage</h3>
-<div class="outline-text-3" id="text-2-3">
-<div class="org-src-container">
-<pre class="src src-sh">clojure -X:repl-server
-clojure -X:repl-server :port 1234
-</pre>
+<div id="outline-container-org6b832d5" class="outline-3">
+<h3 id="org6b832d5"><span class="section-number-3">3.2.</span> <span class="todo TODO">TODO</span> Emacs pREPL</h3>
+<div class="outline-text-3" id="text-3-2">
+<p>
+The next step!
+</p>
+
+<p>
+If you're interested in the project, join us at <a href="https://clojurians.slack.com/archives/C052EBRRU4S">#emacs-prepl</a> on Clojurians Slack!
+</p>
 </div>
 </div>
 </div>
 
-<div id="outline-container-org3adcb90" class="outline-3">
-<h3 id="org3adcb90"><span class="section-number-3">2.4.</span> Emacs integration</h3>
-<div class="outline-text-3" id="text-2-4">
-</div>
-<div id="outline-container-org343c853" class="outline-4">
-<h4 id="org343c853"><span class="section-number-4">2.4.1.</span> Take I: <code>inf-clojure</code></h4>
-<div class="outline-text-4" id="text-2-4-1">
-<div class="org-src-container">
-<pre class="src src-emacs-lisp">((nil
-  (inf-clojure-custom-startup . <span class="org-string">"clojure -X:repl-server :port %d"</span>)
-  <span class="org-comment-delimiter">;</span><span class="org-comment">(inf-clojure-custom-startup . ("localhost" . 5555))</span>
-  (inf-clojure-custom-repl-type . clojure)))
-</pre>
-</div>
-
+<div id="outline-container-org05d48ac" class="outline-2">
+<h2 id="org05d48ac"><span class="section-number-2">4.</span> Resources</h2>
+<div class="outline-text-2" id="text-4">
 <ul class="org-ul">
-<li>Doc <a href="https://github.com/clojure-emacs/inf-clojure#startup">inf-clojure#startup</a>.</li>
-<li>Source <a href="https://github.com/clojure-emacs/inf-clojure/blob/master/inf-clojure.el">inf-clojure.el</a>.</li>
-</ul>
-</div>
-
-<div id="outline-container-org95ed848" class="outline-5">
-<h5 id="org95ed848"><span class="section-number-5">2.4.1.1.</span> <span class="todo TODO">TODO</span> How to load a whole buffer?</h5>
-<div class="outline-text-5" id="text-2-4-1-1">
-<p>
-<i>Reloading a namespace (via require :reload/require :reload-all)</i>
-</p>
-</div>
-</div>
-
-<div id="outline-container-orgf137896" class="outline-5">
-<h5 id="orgf137896"><span class="section-number-5">2.4.1.2.</span> ISSUE</h5>
-<div class="outline-text-5" id="text-2-4-1-2">
-<ul class="org-ul">
-<li>Wouldn't work in Org narrowed source window.</li>
-</ul>
-</div>
-</div>
-
-<div id="outline-container-org879b013" class="outline-5">
-<h5 id="org879b013"><span class="section-number-5">2.4.1.3.</span> WORKAROUND</h5>
-<div class="outline-text-5" id="text-2-4-1-3">
-<ul class="org-ul">
-<li>Open <a href="./src/playground.clj">./src/playground.clj</a>.</li>
-<li>Start the REPL using <code>inf-clojure-socket-repl</code>.</li>
-<li>Close the file.</li>
-<li>Go back to the Org file and work as normal.</li>
-</ul>
-</div>
-</div>
-
-<div id="outline-container-org18efa95" class="outline-5">
-<h5 id="org18efa95"><span class="section-number-5">2.4.1.4.</span> Outcome</h5>
-<div class="outline-text-5" id="text-2-4-1-4">
-<ul class="org-ul">
-<li>Inf-clojure doesn't behave the way I want, in particular it forces me to work in split view at all times.</li>
-<li>Additionally things were broken and took time to debug.</li>
-</ul>
-</div>
-</div>
-</div>
-
-<div id="outline-container-orgb54b57c" class="outline-4">
-<h4 id="orgb54b57c"><span class="section-number-4">2.4.2.</span> Discussion: why is there no Emacs pREPL?</h4>
-<div class="outline-text-4" id="text-2-4-2">
-<p>
-It seems like the way to go, why isn't there a plugin?
-</p>
-
-<p>
-Scenario: the main process has 2 REPLs running, a socket REPL and another pREPL for Cider-like thingy.
-</p>
-
-<p>
-ACTUALLY: then I'd loose my nested REPL interface, I wouldn't even know what's been happening.
-</p>
-
-<p>
-OR NOT? Like it'd work under the hood, but how would it behave?
-</p>
-
-<p>
-It could report exceptions same way Cider does C-x C-e at which point you open side-by-side and debug.
-</p>
-
-<p>
-Of course it'd have to pretty-print it, not show the "real" {:tag &#x2026;} communication.
-</p>
-
-<p>
-You could tweak what inf-clojure sends and that'd do. It'd still show the whole {:tag &#x2026;} thingy on receive, but whatevs.
-</p>
-</div>
-</div>
-
-<div id="outline-container-org99da348" class="outline-4">
-<h4 id="org99da348"><span class="section-number-4">2.4.3.</span> Stepping stone: find or make a nice &amp; easy to use client for the socket REPL</h4>
-<div class="outline-text-4" id="text-2-4-3">
-<ul class="org-ul">
-<li>Something like Pry in Ruby.</li>
-<li>Start with plain socket REPL, upgrade to pREPL.</li>
-<li>Show <code>out</code> in colours with <code>=&gt; ...</code>, distinguish <code>out</code>.</li>
-<li>SubREPL for <code>err</code>.</li>
-<li>Rescue from <code>System/exit</code>.</li>
-<li>Copy and paste from Emacs <code>:'(</code>.
-<ul class="org-ul">
-<li>We need something like <code>copy-last-sexp</code>, <code>copy-parent-form</code> and <code>copy-buffer</code>.</li>
-</ul></li>
-</ul>
-</div>
-
-<div id="outline-container-orga6f1f4b" class="outline-5">
-<h5 id="orga6f1f4b"><span class="section-number-5">2.4.3.1.</span> <span class="todo TODO">TODO</span> Verify it can run say <code>clojure.inspector/inspect-tree</code></h5>
-</div>
-<div id="outline-container-orgf99e631" class="outline-5">
-<h5 id="orgf99e631"><span class="section-number-5">2.4.3.2.</span> <span class="todo TODO">TODO</span> What if you run the client out of Emacs</h5>
-<div class="outline-text-5" id="text-2-4-3-2">
-<p>
-Just send the forms to it. Shell in Emacs is pain and there are no colours (pretty-printing).
-</p>
-
-<p>
-That client would then have to communicate over a socket with Emacs (would be client/server at the same time).
-</p>
-
-<p>
-Or make the server pretty-print? Like if you don't care, here's your Emacs buffer, if it sucks to read, just try to read it in the console where the server prints it?
-</p>
-
-<p>
-YEAH TOTALLY, let the server do it (unless in production).
-</p>
-
-<p>
-EXCEPT the server provides UNUPGRADED REPL only!
-</p>
-</div>
-</div>
-</div>
-
-<div id="outline-container-org0e414d6" class="outline-4">
-<h4 id="org0e414d6"><span class="section-number-4">2.4.4.</span> Take II: custom Emacs plugin</h4>
-<div class="outline-text-4" id="text-2-4-4">
-</div>
-<div id="outline-container-org05d48ac" class="outline-5">
-<h5 id="org05d48ac"><span class="section-number-5">2.4.4.1.</span> Resources</h5>
-<div class="outline-text-5" id="text-2-4-4-1">
-<ul class="org-ul">
+<li><a href="https://github.com/jackrusher/scimacs">scimacs</a> (sci in Emacs) and <a href="https://github.com/borkdude/clj2el">clj2el</a>.</li>
 <li>Emacs EDN parser <a href="https://github.com/clojure-emacs/parseedn">parseedn</a>.</li>
 <li><a href="https://tonsky.me/blog/clojure-sublimed-3/">https://tonsky.me/blog/clojure-sublimed-3/</a></li>
 <li><a href="https://github.com/Olical/propel">propel</a>.</li>
 <li><a href="https://oli.me.uk/clojure-socket-prepl-cookbook/">Clojure socket pREPL cookbook</a>.</li>
 <li><a href="https://blog.jakubholy.net/how-to-use-clojure-1.10-prepl/">How to use Clojure pREPL</a>.</li>
 </ul>
-</div>
-</div>
-
-<div id="outline-container-org9f82739" class="outline-5">
-<h5 id="org9f82739"><span class="section-number-5">2.4.4.2.</span> Architecture</h5>
-<div class="outline-text-5" id="text-2-4-4-2">
-<ul class="org-ul">
-<li>Start a normal socket REPL, upgrade to pREPL at the beginning of the client session.</li>
-</ul>
-</div>
-</div>
-</div>
 </div>
 </div>
 </div>
