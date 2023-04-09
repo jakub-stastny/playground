@@ -73,24 +73,18 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
     app
     (let [a :top-level] (let [b :nested] (local-context)))
     ,*2
-    (macroexpand '(break'))
-    (doseq [i [1 2 3]] (break)) ; Syntax error macroexpanding clojure.core/fn at (4:20).
-    ; #:clojure.error{:phase :macro-syntax-check, :line 4, :column 20, :source NO_SOURCE_PATH, :symbol clojure.core/fn}
+    (doseq [i [1 0]] (break) (/ 1 i))
 
     ;; ExceptionInfo with data.
     (throw (ex-info "Fuck this" {:cant-be-bothered true}))
-    ,*e  ;; Syntax error compiling fn* at (1:1).
-        ;; #:clojure.error{:phase :compile-syntax-check, :line 1, :column 1, :source NO_SOURCE_PATH, :symbol fn*}
-    app ;; ; Syntax error compiling fn* at (1:1).
-        ;; #:clojure.error{:phase :compile-syntax-check, :line 1, :column 1, :source NO_SOURCE_PATH, :symbol fn*}
-    (local-context)                       ; The same as well.
-    (ex-data *e)
-    (ex-message *e)
+    ,*e
+    app
+    (local-context)
+    {:message (ex-message *e) :data (ex-data *e)}
 
     ;; Other exceptions.
     (conj {} 1)
-    (ex-data *e)
-    (ex-message *e)
+    {:message (ex-message *e) :data (ex-data *e)}
 
     ; Get out of nested REPLs with exception context.
     :repl/quit
@@ -170,6 +164,19 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
       `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
           ~expr)))
 
+  ; @phronmophobic:
+  ; Instead of embedding the values, I would use eval to create a function and call it:
+  ; You can also do something like save the values in a dynamic variable and then grab the values inside of the eval from the dynamic variable, but I think wrapping in a function is more explicit and less brittle.
+  (defn contextual-eval-2 [ctx expr]
+    (let [f
+          (eval
+           `(fn [~@(keys ctx)]
+              ~expr))]
+      (apply f (vals ctx))))
+
+  (prn :ctx-evl-2 (contextual-eval-2 {'a (Exception. "hi") 'b 2}
+                     '(str (.getMessage a) " " b)))
+
   ; TODO: map onto a command like "vars" or "ls".
   (defmacro local-context []
     ;; (prn :lc) ; DBG
@@ -180,7 +187,7 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
   ; Do NOT extract :eval into a method or the local-context will get lost.
   (defmacro break []
     `(do
-       (clojure.main/repl :prompt #(print "debug=> ") :read rs/repl-read :eval (partial contextual-eval (local-context)))))
+       (clojure.main/repl :prompt #(print "debug=> ") :read rs/repl-read :eval (partial contextual-eval-2 (local-context)))))
 
   (def nesting-level (atom 0))
 
@@ -193,26 +200,22 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
 
   ;; repl-read respects :repl/quit
   (declare handle-error)
-  (defmacro start-nested-repl [e]
+  (defmacro start-nested-repl [*e]
     `(do
        (println "Inspect *e for details about the error.")
-       (prn :handle-error (type ~'e) :ctx (local-context)) ; DBG
        (clojure.main/repl
-        ; FIXME: The def approach doesn't work for sub shell .... or does it???
-        :init #(def ~'*e ~'e) ; WARNING: *e already refers to: #'clojure.core/*e in namespace: jakub-stastny.dev.repl,
-        ; being replaced by: #'jakub-stastny.dev.repl/*e
-        :prompt (error-prompt ~'e)
+        :prompt (error-prompt ~'*e)
         :caught handle-error
-        ;; :eval (partial contextual-eval (local-context))
+        :eval (partial contextual-eval-2 (local-context))
         ;; :eval super-unsafe-eval-wrapper
         :read rs/repl-read)))
 
-  (defn handle-error [e]
-    (prn :handle-error (type e) :ctx (local-context)) ; DBG
+  (defn handle-error [*e]
+    (prn :handle-error (type *e) :ctx (keys (local-context))) ; DBG
     (swap! nesting-level inc)
-    (println (ex-message e) (or (ex-data e) ""))
+    (println (ex-message *e) (or (ex-data *e) ""))
     ;(prn :context (local-context)) ; e
-    (start-nested-repl e)
+    (start-nested-repl *e)
     (swap! nesting-level dec))
 
   (defn upgrade-init []
