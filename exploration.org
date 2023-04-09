@@ -280,6 +280,8 @@ The next step!
 
 If you're interested in the project, join us at [[https://clojurians.slack.com/archives/C052EBRRU4S][#emacs-prepl]] on Clojurians Slack!
 
+I'm hoping to gather some feedback before I start coding.
+
 * Resources
 - [[https://github.com/jackrusher/scimacs][scimacs]] (sci in Emacs) and [[https://github.com/borkdude/clj2el][clj2el]].
 - Emacs EDN parser [[https://github.com/clojure-emacs/parseedn][parseedn]].
