@@ -138,16 +138,18 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
      [clojure.string :as str]
      [clojure.core.server :as rs]))
 
+  ; https://stackoverflow.com/questions/38183267/clojures-eval-does-not-see-local-symbols
+  ; DOES &env get both a & b from (let [a :a] (let [b :b] (break))) ?
   (defmacro super-unsafe-eval
     "Like `eval`, but also exposes lexically-bound variables to eval. This
     is almost certainly a bad idea."
     [form]
-    (prn :SUE)
-    (prn :super-unsafe-eval `(eval (list 'let
-                      ~(vec (mapcat #(vector `(quote ~%)
-                                             `(list 'quote ~%))
-                                    (keys &env)))
-                      ~form)))
+    ;; (prn :SUE)
+    ;; (prn :super-unsafe-eval `(eval (list 'let
+    ;;                   ~(vec (mapcat #(vector `(quote ~%)
+    ;;                                          `(list 'quote ~%))
+    ;;                                 (keys &env)))
+    ;;                   ~form)))
     `(eval (list 'let
                ~(vec (mapcat #(vector `(quote ~%)
                                       `(list 'quote ~%))
@@ -156,19 +158,18 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
 
   ; From The joy of Clojure
   (defn contextual-eval [ctx expr]
-    (prn :ctx-ev :ctx ctx :e expr) ; DBG
-    (prn
-      `(let [~@(mapcat (fn [[k v]] [k `'~v]) ctx)]
-          ~expr))
-    (super-unsafe-eval ; This won't work in CLJS I think.
-      `(let [~@(mapcat (fn [[k v]] [k `'~v]) ctx)]
+    ;; (prn :ctx-ev :ctx ctx :e expr) ; DBG
+    ; IT DOESN'T KNOW HOW TO SERIALISE THIS:
+    ; chunk_328 #object[clojure.lang.ArrayChunk 0x6428591a "clojure.lang.ArrayChunk@6428591a"]
+    (eval ; This won't work in CLJS I think.
+      `(let [~@(mapcat (fn [[k v]] [k `'~v]) (filter (fn [[k v]] (not (.startsWith (str k) "chunk"))) ctx))]
           ~expr)))
 
   ; TODO: map onto a command like "vars" or "ls".
   (defmacro local-context []
-    (prn :lc) ; DBG
+    ;; (prn :lc) ; DBG
     (let [symbols (keys &env)]
-      (prn :local-context &env :keys (keys &env)) ; DBG
+      ;; (prn :local-context &env :keys (keys &env)) ; DBG
       (zipmap (map (fn [sym] `(quote ~sym)) symbols) symbols)))
 
   ; Use ::tl to continue.
@@ -178,27 +179,12 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
       (prn :readr :p prompt :ec exit-code) ; DBG
       (if (= input ::tl) exit-code input)))
 
-  (defn knievel [expr]
-    (prn :eval :expr expr :ctx (local-context))
-    ;; (eval expr)
-    ;:done ; Just return
-
-    ; :eval :expr i :ctx {expr i}
-    ; Should this have i as a key also? Or that's sorted in the eval?
-
-    ; We're evaluating (clojure.core/let [expr (quote i)] i)
-
-    ; THE ISSUE IS IT NEVER EVEN TRIES TO EVALUATE IN contextual-eval, it fails before that.
-    ; Unable to resolve symbol: i in this context
-    (contextual-eval (local-context) expr)
-    )
-
-  ;; (def knievel (partial contextual-eval (local-context)))
-
   (defn prompt [] (print "debug=> "))
 
+  ; Do NOT extract :eval into a method or the local-context will get lost.
   (defmacro break []
-    `(clojure.main/repl :prompt prompt :eval knievel))
+    `(do
+       (clojure.main/repl :prompt prompt :read readr :eval (partial contextual-eval (local-context)))))
     ;; `(clojure.main/repl :prompt prompt :read readr :eval evl))
 
   (def nesting-level (atom 0))
