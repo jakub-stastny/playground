@@ -224,10 +224,18 @@ From [[https://tonsky.me/blog/clojure-sublimed-3/][Clojure Sublimed 3]], ~REPL, 
     ;; I've seen a better approach for :eval to wrap the whole code in (do (require...) (code)) so it's available anywhere, although that can easily lead to code that works only in the REPL.
     (rs/repl-init))
 
+  (def colours {:red 31 :green 32 :yellow 33
+              :blue 34 :purple 35 :cyan 36 :grey 37})
+
+  (defn colour "Wraps text in ANSI colour escape sequence" [colour text]
+    (if-let [colour-code (colours colour)]
+      (str "\033[" colour-code "m" text "\033[0m") text))
+
+  ; This REPL is meant to be used as Pry in Ruby, not in Emacs, for that we will use pREPL later.
   (defn upgrade-repl []
     (clojure.main/repl
      :caught #'handle-error
-     :prompt #(print (str "STANDARD." (ns-name *ns*) "=> "))
+     :prompt #(print (str (colour :green (ns-name *ns*)) (colour :cyan" λ ")))
      :print prn ; TODO pretty-print
      :init #'upgrade-init
      :read rs/repl-read))
