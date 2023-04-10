@@ -105,6 +105,7 @@ Say you have ~(doseq [i [1 0]] (try-break (/ 1 i)))~. Run ~C-x C-e~ on it. Then 
 **** Refs
 - [[https://clojure.org/guides/deps_and_cli#socket_repl][Deps and CLI guide: socket REPL]].
 - [[https://github.com/clojure/clojure/blob/38524061dcb14c598c239be87184b3378ffc5bac/src/clj/clojure/main.clj#L368][clojure.main/repl]].
+- [[https://github.com/bhauman/rebel-readline/blob/91f6fca7b6b9c191865cbd22a247a7145c0130db/rebel-readline/src/rebel_readline/clojure/main.clj#L1][rebel-readline/clojure/main.clj]].
 
 *** REPL server
 #+begin_src clojure :tangle src/jakub_stastny/dev/repl/server.clj :mkdirp yes
@@ -274,6 +275,37 @@ It'll get loaded automatically when we run ~clojure X:repl-server~ and it runs /
     {:message (ex-message *e) :data (ex-data *e)}
     ,)
 #+end_src
+
+*** TODO The actual workflow?
+Stuart S stays in ~user~, where he has all the convenience functions.
+
+I don't think that'd work for me. Even if I stay in one file only as I often do, I want to eval the ~ns~ form, because that's where all the ~require~'s are.
+
+*** TODO Can we abuse [[https://clojure.org/reference/reader#tagged_literals][tagged literals]] to get ~#dbg~?
+The point is so we don't have to wrap an expression in say ~(try-break s-sexp)~. Not to mention it'd be great to see these visually as a different thing, as they are not meant to make it to the production code.
+
+*** TODO How to solve the CLJS question?
+
+REBL or ~tap>~ & inspect in ShadowCLJS is great, but I really really prefer drilling into small functions and get response in the REPL rather than in an external thingy.
+
+In my CLJS project I make everything that makes sense to have generic a ~.cljc~ file, any more complex logic should go there. Then the subREPLs work just fine.
+
+Is it a solution to everything? I don't know. It could be good enough insofar that for UI development one uses the browser anyway, I mean you don't really want to see a bunch of hiccup vectors in the REPL.
+
+*** TODO Document limitations
+Like ~(range)~ etc.
+
+*** TODO [[https://github.com/greglook/puget][puget]]-based colours
+
+*** TODO The app
+An example app we're working on.
+
+*** TODO Reloading with [[https://github.com/clojure/tools.namespace][clojure.tools.namespace]]
+Will it work? There are many ifs.
+
+/Some projects have a "project REPL" or a "scratch" namespace where you want keep state during development. You can use the functions disable-unload! and disable-reload! in clojure.tools.namespace.repl to prevent refresh from automatically un/reloading those namespaces./
+
+Probably worth experimenting with ~:reload~ and ~:reload-all~.
 
 /{{{highlight(If you want to get this code you have to tangle it using Org-mode's C-v t!)}}}/
 

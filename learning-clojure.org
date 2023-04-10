@@ -1,0 +1,117 @@
+#+TITLE: Learning Clojure
+
+*** Error handling
+- [[https://github.com/IGJoshua/farolero][farolero]] Thread-safe Common Lisp style conditions and restarts for Clojure(Script).
+- [[https://github.com/fmnoise/flow][flow]] Functional (and opinionated) errors handling in Clojure. exception instance as error value (not throwing).
+- [[https://github.com/amitayh/either-clj][either-clj]] Simple error handling for Clojure, inspired by monads, also [[https://github.com/kumarshantanu/promenade][promenade]] and [[https://github.com/adambard/failjure]].
+- https://jakemccrary.com/blog/2018/02/18/using-clojure-macros-for-nicer-error-handling/
+- https://www.youtube.com/watch?v=FsyPQG_IuaY
+- https://adambard.com/blog/acceptable-error-handling-in-clojure/
+- https://clojureverse.org/t/is-error-throwing-bad-functional-programming/2188/7?page=2
+- https://clojureverse.org/t/error-handling-in-clojure/1877/2
+- https://bsima.me/clog/robust-clojure-nil.html
+- https://www.learn-clojurescript.com/section-4/lesson-24-handling-exceptions-and-errors/
+- https://fsharpforfunandprofit.com/rop/
+- https://grishaev.me/en/clj-book-exceptions/
+- https://github.com/MichaelDrogalis/dire erlang style supervisor
+- http://web.archive.org/web/20150301143918/http://michaeldrogalis.tumblr.com/post/40181639419/try-catch-complects-we-can-do-so-much-better
+- https://wil.yegelwel.com/Error-Handling-with-Clojure-Async/ core async
+- https://blog.jakubholy.net/2019/core-async-error-handling/ core async
+
+*** Transducers
+- https://clojure.org/reference/transducers
+- https://clojuredocs.org/clojure.core/transduce see examples
+
+*** Spec
+- [[https://github.com/clojure/spec-alpha2/wiki/Differences-from-spec.alpha][spec-alpha2 differences from spec.alpha]].
+- spec-alpha2 [[https://github.com/clojure/spec-alpha2/wiki/Schema-and-select][schema and select]].
+- [[https://clojure.wladyka.eu/posts/form-validation/][Form validation with spec]].
+- [[https://www.pixelated-noise.com/blog/2020/09/10/what-spec-is/][Great guide to spec]].
+
+*** Watch for nil
+#+begin_src clojure
+  (some-> 1 inc inc inc) ; 4
+  (some-> nil inc inc inc) ; nil
+#+end_src
+
+- Macro [[https://clojuredocs.org/clojure.core/some-%3E][some->]].
+- Macro [[https://clojuredocs.org/clojure.core/some-%3E%3E][some->>]].
+
+*** Thread-first, thread-last and variable
+#+begin_src clojure
+  (-> {:a {:b {:c {:d {:e "f"}}}}} :a :b :c :d :e)
+  ; => "f"
+
+  (as-> {:a {:b {:c {:d {:e "f"}}}}} $
+    (:a $) (:b $) (:c $) (:d $) (:e $))
+
+  ; => "f"
+#+end_src
+
+- Macro [[https://clojuredocs.org/clojure.core/as-%3E][as->]].
+- Macro [[https://clojuredocs.org/clojure.core/-%3E][->]].
+- Macro [[https://clojuredocs.org/clojure.core/-%3E%3E][->>]].
+
+- Macro [[https://clojuredocs.org/clojure.core/doto][doto]].
+
+- Macro [[https://clojuredocs.org/clojure.core/cond-%3E][cond->]].
+- Macro [[https://clojuredocs.org/clojure.core/cond-%3E%3E][cond->>]].
+
+- Macro [[https://clojuredocs.org/clojure.core/if-some][if-some]].
+- Macro if-let
+  when-let
+
+** Nil-punning
+#+begin_src clojure
+  ((fnil str ".") nil)
+#+end_src
+
+- [[https://clojuredocs.org/clojure.core/fnil][fnil]].
+
+* Monads
+#+begin_quote
+  Both were custom monad implementations. Both work(ed) reasonably well. However things have a relatively high strangeness factor. Since the execution of things is deferred till someone actually runs the monad pipeline, you can't use your usual try/catch construct to take care of problems. Everything has to be constrained to your monadic function. So you need to have some way to error out of your monadic pipeline. This leads you to monad transformers and complicates things even more.
+#+end_quote
+~ [[https://groups.google.com/g/clojure/c/vPH9-_AQXwc/m/eWJzaxffA5sJ][Meikel Brandmeyer]].
+
+#+begin_quote
+  I really like how they eliminate the need for dealing with state held in symbols. I've found that testing is easier and code is cleaner using them.
+#+end_quote
+~ [[https://groups.google.com/g/clojure/c/vPH9-_AQXwc/m/NKvUkbkQVZoJ][Jim]].
+
+:pre and :post metadata on functions are a superbly "blunt instrument" for spur-of-the-moment entry/exit logging! (But you have to remember to put true after the log statement.)
+
+* Component
+
+#+begin_quote
+Don’t use any globals, period! Build your entire application as a value. Keep state locally. Manage the lifecycle for the whole thing with a single function call that returns the started or stopped system.
+#+end_quote
+~ Summary of Clojure workflow, reloaded from [[https://medium.com/@TheLaddersEng/stateful-components-in-clojure-part-2-897aa28112da][here]].
+
+- https://cognitect.com/blog/2013/06/04/clojure-workflow-reloaded
+- http://thinkrelevance.com/blog/2013/06/04/clojure-workflow-reloaded
+- https://lambdaisland.com/episodes/stuartsierra-component-system
+- https://vimeo.com/152177620
+- https://www.youtube.com/watch?v=13cmHf_kt-Q and slides https://stuartsierra.com/download/2014-03-25-components-clojurewest.pdf
+- Wallmart uses it https://www.youtube.com/watch?v=av9Xi6CNqq4
+- https://stackoverflow.com/questions/29070883/how-to-use-stuart-sierras-component-library-in-clojure
+- https://clojureverse.org/t/stuart-sierra-components-and-config/7996/4
+- https://joaoptrindade.com/clojure-tutorial-part-2-web-server-and-suart-sierra-components
+- https://github.com/stuartsierra/component
+- https://news.ycombinator.com/item?id=7120537
+- https://stuartsierra.com/2013/03/29/perils-of-dynamic-scope#fnr.4
+- https://groups.google.com/g/clojure-dev/c/S8BawG7nzJA
+- https://groups.google.com/g/clojure/c/2-baBp61XTs/m/d42XerDcu2wJ
+- https://clojure.org/reference/vars
+
+* Clojars
+- https://kozieiev.com/blog/creating-and-publishing-clojure-libraries/
+- https://clojars.org
+
+* Web frameworks
+- https://kennytilton.github.io/web-mx-quickstart/#/intro
+- https://github.com/kennytilton/web-mx
+
+* References
+- https://www.braveclojure.com/
+- https://mishadoff.com/blog/clojure-design-patterns/
